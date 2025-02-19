@@ -70,11 +70,11 @@ func main() {
 	log.Printf("Setup Jaya Service")
 	jayaClient := services.NewJayaService(cfg.JayaApi)
 
-	// Create InfluxDB client
-	log.Printf("Setup Influxdb Service")
+	// Create Timescaledb client
+	log.Printf("Setup Timescaledb Service")
 	timescaleClient, err := services.NewTimescaleClient(ctx, cfg.TimescaleDB)
 	if err != nil {
-		log.Fatalf("Error creating InfluxDB client: %v", err)
+		log.Fatalf("Error creating Timescaledb client: %v", err)
 	}
 
 	// Start the service
