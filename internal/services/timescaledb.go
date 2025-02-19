@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"jaya-transport-service/config"
 
-	_ "github.com/jackc/pgx/v5"
+	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
 type TimescaleClient struct {
