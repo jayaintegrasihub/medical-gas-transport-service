@@ -5,7 +5,7 @@ on:
     branches:
       - 'main'
     tags:
-      - 'v*'
+      - 'v*.*.*'
   pull_request:
     branches:
       - 'main'
@@ -23,7 +23,7 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: |
-            jaya-transport-service-v2/main
+            ${{secrets.DOCKERHUB_USERNAME}}/jaya-transport-service-v2
           tags: |
             type=ref,event=branch
             type=ref,event=pr
@@ -35,7 +35,6 @@ jobs:
            echo "${{secrets.ENV_FILE_DEVELOPMENT}}" > .env
       -
         name: Login to DockerHub
-        if: github.event_name != 'pull_request'
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -45,6 +44,6 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          push: ${{ github.event_name != 'pull_request' }}
+          push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
