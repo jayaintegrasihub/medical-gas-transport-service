@@ -32,7 +32,7 @@ jobs:
       -
          name: create environment production
          run: |
-           echo "${{secrets.ENV_FILE_DEVELOPMENT}}" 
+           echo "${{secrets.ENV_FILE_DEVELOPMENT}}" > .env
       -
         name: Login to DockerHub
         uses: docker/login-action@v3
