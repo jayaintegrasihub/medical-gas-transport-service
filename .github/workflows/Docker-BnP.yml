@@ -32,7 +32,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{secrets.DOCKER_USERNAME}}/jaya-transport-service-v2
+          images: ${{secrets.DOCKER_USERNAME}}/${{secrets.DOCKERHUB_REPOSITORY}}
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
