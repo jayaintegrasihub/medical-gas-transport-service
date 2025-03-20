@@ -46,6 +46,7 @@ type TimescaleDBConfig struct {
 	Port     string
 	DBName   string
 	SSLMode  string
+	Enabled  bool
 }
 
 func LoadConfig() *Config {
@@ -83,6 +84,7 @@ func LoadConfig() *Config {
 			Port:     viper.GetString("TIMESCALEDB_PORT"),
 			DBName:   viper.GetString("TIMESCALEDB_DB_NAME"),
 			SSLMode:  viper.GetString("TIMESCALEDB_SSL_MODE"),
+			Enabled:  viper.GetBool("TIMESCALEDB_ENABLED"),
 		},
 	}
 }

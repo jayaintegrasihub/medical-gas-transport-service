@@ -1,6 +1,9 @@
 package internal
 
-import "fmt"
+import (
+	"fmt"
+	"time"
+)
 
 type DeviceHealth struct {
 	MessageId   int           `json:"msgId"`
@@ -55,6 +58,66 @@ type NodeIOData struct {
 type IOData struct {
 	Value interface{} `json:"value"`
 	Tag   string      `json:"tag"`
+}
+
+type OxygenLevelData struct {
+	Timestamp          time.Time `json:"-"`
+	SerialNumber       string    `json:"-"`
+	
+	Ts                int64     `json:"ts"`
+	Device            struct {
+		DeviceUptime  int       `json:"uptime"`
+		DeviceTemp    float64   `json:"temp"`
+		DeviceHum     float64   `json:"hum"`
+		DeviceLong    float64   `json:"long"`
+		DeviceLat     float64   `json:"lat"`
+		DeviceRSSI    int       `json:"rssi"`
+		DeviceHWVer   string    `json:"hwVer"`
+		DeviceFWVer   string    `json:"fwVer"`
+		DeviceRDVer   string    `json:"rdVer"`
+		DeviceModel   string    `json:"model"`
+	} `json:"device"`
+	
+	Level             float64   `json:"level"`
+	Solar             struct {
+		SolarBattStatus    []string  `json:"battStat"`
+		SolarDeviceStatus  []string  `json:"deviceStat"`
+		SolarLoadStatus    []string  `json:"loadStat"`
+		SolarBattTemp      int       `json:"battTemp"`
+		SolarBattLevel     int       `json:"battLevel"`
+		SolarEGen          []int     `json:"eGen"`
+		SolarECom          []int     `json:"eCom"`
+	} `json:"solar"`
+}
+
+type OxygenFlowData struct {
+	Timestamp          		time.Time `json:"-"`
+	SerialNumber       		string    `json:"-"`
+	
+	Ts                	int64     `json:"ts"`
+	Device            	struct {
+		DeviceUptime  		int       `json:"uptime"`
+		DeviceTemp    		float64   `json:"temp"`
+		DeviceHum     		float64   `json:"hum"`
+		DeviceLong    		float64   `json:"long"`
+		DeviceLat     		float64   `json:"lat"`
+		DeviceRSSI    		int       `json:"rssi"`
+		DeviceHWVer   		string    `json:"hwVer"`
+		DeviceFWVer   		string    `json:"fwVer"`
+		DeviceRDVer   		string    `json:"rdVer"`
+		DeviceModel   		string    `json:"model"`
+	} `json:"device"`
+	
+	FlowRate          	float64   `json:"level"`
+	Solar             	struct {
+		SolarBattStatus    []string  `json:"battStat"`
+		SolarDeviceStatus  []string  `json:"deviceStat"`
+		SolarLoadStatus    []string  `json:"loadStat"`
+		SolarBattTemp      int       `json:"battTemp"`
+		SolarBattLevel     int       `json:"battLevel"`
+		SolarEGen          []int     `json:"eGen"`
+		SolarECom          []int     `json:"eCom"`
+	} `json:"solar"`
 }
 
 func convertToMap(dataArray []IOData) (map[string]interface{}, error) {
