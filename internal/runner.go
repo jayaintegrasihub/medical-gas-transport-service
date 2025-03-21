@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"jaya-transport-service/config"
-	"jaya-transport-service/internal/services"
+	"medical-gas-transport-service/config"
+	"medical-gas-transport-service/internal/services"
 
 	"github.com/eclipse/paho.golang/autopaho"
 	"github.com/eclipse/paho.golang/paho"
@@ -99,7 +99,7 @@ func (s *Service) handleOxygenLevel(topic string, payload []byte) {
 
 	levelData.SerialNumber = serialNumber
 	levelData.Timestamp = time.Unix(levelData.Ts, 0)
-	
+
 	if s.cfg.TimescaleDB.Enabled {
 		query := `
 			INSERT INTO sensor_level (
@@ -139,7 +139,7 @@ func (s *Service) handleOxygenLevel(topic string, payload []byte) {
 		}
 	} else {
 		tags := map[string]string{
-			"serial_number":        levelData.SerialNumber,
+			"serial_number": levelData.SerialNumber,
 		}
 
 		fields := map[string]interface{}{
@@ -215,7 +215,7 @@ func (s *Service) handleOxygenFlow(topic string, payload []byte) {
 	} else {
 
 		tags := map[string]string{
-			"serial_number":        flowData.SerialNumber,
+			"serial_number": flowData.SerialNumber,
 		}
 
 		fields := map[string]interface{}{
@@ -363,9 +363,9 @@ func (s *Service) writeToInfluxDB(bucket string, point *write.Point) {
 }
 
 func (s *Service) writeToTimescaleDB(query string, args ...interface{}) error {
-    _, err := s.timescaleClient.DB.ExecContext(s.ctx, query, args...)
-    if err != nil {
-        return fmt.Errorf("error writing data to TimescaleDB: %w", err)
-    }
-    return nil
+	_, err := s.timescaleClient.DB.ExecContext(s.ctx, query, args...)
+	if err != nil {
+		return fmt.Errorf("error writing data to TimescaleDB: %w", err)
+	}
+	return nil
 }

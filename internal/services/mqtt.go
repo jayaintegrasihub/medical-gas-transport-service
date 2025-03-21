@@ -5,8 +5,8 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
-	"jaya-transport-service/config"
 	"log"
+	"medical-gas-transport-service/config"
 	"net/url"
 	"time"
 
@@ -67,7 +67,7 @@ func generateRandomClientID(length int) (string, error) {
 	if _, err := rand.Read(bytes); err != nil {
 		return "", err
 	}
-	return "jaya-transport-service-" + hex.EncodeToString(bytes), nil
+	return "medical-gas-transport-service-" + hex.EncodeToString(bytes), nil
 }
 
 func DisconnectMQTTClient(c *autopaho.ConnectionManager) {

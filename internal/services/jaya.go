@@ -3,7 +3,7 @@ package services
 import (
 	"errors"
 	"fmt"
-	"jaya-transport-service/config"
+	"medical-gas-transport-service/config"
 	"time"
 
 	"github.com/go-resty/resty/v2"

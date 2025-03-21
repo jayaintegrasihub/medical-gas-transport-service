@@ -3,10 +3,10 @@ package main
 import (
 	"context"
 	"fmt"
-	"jaya-transport-service/config"
-	"jaya-transport-service/internal"
-	"jaya-transport-service/internal/services"
 	"log"
+	"medical-gas-transport-service/config"
+	"medical-gas-transport-service/internal"
+	"medical-gas-transport-service/internal/services"
 	"os"
 	"os/signal"
 	"syscall"

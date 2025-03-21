@@ -18,7 +18,7 @@ RUN go mod download
 COPY . .
 
 # Build the Go app
-RUN go build -o jaya-transport-service
+RUN go build -o medical-gas-transport-service
 
 # Stage 2: Run the Go application
 FROM alpine:latest
@@ -30,10 +30,10 @@ RUN apk --no-cache add ca-certificates
 WORKDIR /root/
 
 # Copy the Pre-built binary file from the previous stage
-COPY --from=builder /app/jaya-transport-service .
+COPY --from=builder /app/medical-gas-transport-service .
 
 # Copy the .env file
 COPY .env .
 
 # Command to run the executable
-CMD ["./jaya-transport-service"]
+CMD ["./medical-gas-transport-service"]

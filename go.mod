@@ -1,4 +1,4 @@
-module jaya-transport-service
+module medical-gas-transport-service
 
 go 1.21.4
 

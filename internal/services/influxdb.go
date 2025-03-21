@@ -3,7 +3,7 @@ package services
 import (
 	"context"
 	"fmt"
-	"jaya-transport-service/config"
+	"medical-gas-transport-service/config"
 
 	influxdb2 "github.com/influxdata/influxdb-client-go/v2"
 	"github.com/influxdata/influxdb-client-go/v2/api"

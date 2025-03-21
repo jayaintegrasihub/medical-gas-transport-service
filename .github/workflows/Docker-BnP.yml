@@ -31,7 +31,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{secrets.DOCKER_USERNAME}}/jaya-transport-service-v2
+          images: ${{secrets.DOCKER_USERNAME}}/medical-gas-transport-service-v2
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern=latest

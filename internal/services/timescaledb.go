@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"jaya-transport-service/config"
+	"medical-gas-transport-service/config"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 )

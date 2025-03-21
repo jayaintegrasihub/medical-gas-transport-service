@@ -3,7 +3,7 @@ package services
 import (
 	"context"
 	"fmt"
-	"jaya-transport-service/config"
+	"medical-gas-transport-service/config"
 	"time"
 
 	"github.com/redis/go-redis/v9"
