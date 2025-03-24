@@ -108,7 +108,7 @@ type OxygenFlowData struct {
 		DeviceModel   		string    `json:"model"`
 	} `json:"device"`
 	
-	FlowRate          	float64   `json:"level"`
+	FlowRate          	float64   `json:"flow_rate"`
 	Solar             	struct {
 		SolarBattStatus    []string  `json:"battStat"`
 		SolarDeviceStatus  []string  `json:"deviceStat"`
