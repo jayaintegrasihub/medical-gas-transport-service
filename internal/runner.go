@@ -156,6 +156,13 @@ func (s *Service) handleOxygenLevel(topic string, payload []byte) {
 		s.writeToInfluxDB("oxygen_metrics", point)
 	}
 
+	event := map[string]interface{}{
+		"level":  levelData,
+	}
+	eventJSON, _ := json.Marshal(event)
+	s.redisClient.Rdb.Publish(s.ctx, "oxygen:updates", eventJSON)
+	log.Println("Data processed and published:", levelData)
+
 	log.Printf("Successfully stored oxygen level data for device %s", levelData.SerialNumber)
 }
 
@@ -231,6 +238,13 @@ func (s *Service) handleOxygenFlow(topic string, payload []byte) {
 		point := influxdb2.NewPoint("oxygen_flow", tags, fields, flowData.Timestamp)
 		s.writeToInfluxDB("oxygen_metrics", point)
 	}
+
+	event := map[string]interface{}{
+		"flow":  flowData,
+	}
+	eventJSON, _ := json.Marshal(event)
+	s.redisClient.Rdb.Publish(s.ctx, "oxygen:updates", eventJSON)
+	log.Println("Data processed and published:", flowData)
 
 	log.Printf("Successfully stored oxygen flow data for device %s", flowData.SerialNumber)
 }
