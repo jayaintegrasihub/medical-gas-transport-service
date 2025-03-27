@@ -187,9 +187,8 @@ func (s *Service) handleOxygenFlow(topic string, payload []byte) {
 			INSERT INTO sensor_flow (
 				time, serial_number, flow_rate, device_uptime, device_temp, 
 				device_hum, device_long, device_lat, device_rssi, device_hw_ver, device_fw_ver, 
-				device_rd_ver, device_model, solar_batt_temp, solar_batt_level, solar_batt_status, 
-				solar_device_status, solar_load_status, solar_e_gen, solar_e_com
-			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
+				device_rd_ver, device_model
+			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 		`
 
 		err = s.writeToTimescaleDB(query,
@@ -206,13 +205,6 @@ func (s *Service) handleOxygenFlow(topic string, payload []byte) {
 			flowData.Device.DeviceFWVer,
 			flowData.Device.DeviceRDVer,
 			flowData.Device.DeviceModel,
-			flowData.Solar.SolarBattTemp,
-			flowData.Solar.SolarBattLevel,
-			pq.Array(flowData.Solar.SolarBattStatus),
-			pq.Array(flowData.Solar.SolarDeviceStatus),
-			pq.Array(flowData.Solar.SolarLoadStatus),
-			pq.Array(flowData.Solar.SolarEGen),
-			pq.Array(flowData.Solar.SolarECom),
 		)
 
 		if err != nil {
@@ -231,8 +223,6 @@ func (s *Service) handleOxygenFlow(topic string, payload []byte) {
 			"device_temp":      flowData.Device.DeviceTemp,
 			"device_hum":       flowData.Device.DeviceHum,
 			"device_rssi":      flowData.Device.DeviceRSSI,
-			"solar_batt_temp":  flowData.Solar.SolarBattTemp,
-			"solar_batt_level": flowData.Solar.SolarBattLevel,
 		}
 
 		point := influxdb2.NewPoint("oxygen_flow", tags, fields, flowData.Timestamp)

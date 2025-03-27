@@ -109,15 +109,6 @@ type OxygenFlowData struct {
 	} `json:"device"`
 	
 	FlowRate          	float64   `json:"flow_rate"`
-	Solar             	struct {
-		SolarBattStatus    []string  `json:"battStat"`
-		SolarDeviceStatus  []string  `json:"deviceStat"`
-		SolarLoadStatus    []string  `json:"loadStat"`
-		SolarBattTemp      int       `json:"battTemp"`
-		SolarBattLevel     int       `json:"battLevel"`
-		SolarEGen          []int     `json:"eGen"`
-		SolarECom          []int     `json:"eCom"`
-	} `json:"solar"`
 }
 
 func convertToMap(dataArray []IOData) (map[string]interface{}, error) {
