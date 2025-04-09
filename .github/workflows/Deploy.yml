@@ -4,11 +4,9 @@ on:
   release:
     types: [created]
 
-
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -16,8 +14,7 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      -
-        name: create environment production
+      - name: create environment production
         run: |
           echo "${{secrets.ENV_FILE_DEVELOPMENT}}" > .env
 
@@ -31,7 +28,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{secrets.DOCKER_USERNAME}}/medical-gas-transport-service
+          images: jayaintegrasihub/medical-gas-transport-service
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern=latest
@@ -45,22 +42,21 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
-deploy:
-  needs: build-and-push
-  name: Push docker to server
-  runs-on: ubuntu-latest
-  steps:
+  deploy:
+    needs: build-and-push
+    name: Push docker to server
+    runs-on: ubuntu-latest
+    steps:
       - name: executing remote ssh command using password
-        users: appleboy/ssh-action@v1.2.1
+        uses: appleboy/ssh-action@v1.2.1
         with:
-          host: ${{secrets.HOST}}
-          username: ${{secrets.USERNAME}}
-          password: ${{secrets.PASSWORD}}
-          port: ${{secrets.PORT}}
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          password: ${{ secrets.PASSWORD }}
+          port: ${{ secrets.PORT }}
           script: |
-              docker stop medical-gas-transport-service || echo "Container not running"
-              docker rm medical-gas-transport-service
-              docker rmi jayaintegrasihub/medical-gas-transport-service:latest
-              docker pull jayaintegrasihub/medical-gas-transport-service:latest || echo "Failed to pull image"
-
-              docker run -t -d -p 5341:5341 --env-file .env.medical-gas-transport-service --name medical-gas-transport-service --restart always jayaintegrasihub/medical-gas-transport-service:latest
+            docker stop medical-gas-transport-service || echo "Container not running"
+            docker rm medical-gas-transport-service
+            docker rmi jayaintegrasihub/medical-gas-transport-service:latest
+            docker pull jayaintegrasihub/medical-gas-transport-service:latest || echo "Failed to pull image"
+            docker run -t -d -p 5341:5341 --env-file .env.medical-gas-transport-service --name medical-gas-transport-service jayaintegrasihub/medical-gas-transport-service:latest
