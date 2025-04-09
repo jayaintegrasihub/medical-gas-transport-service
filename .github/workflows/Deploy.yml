@@ -59,4 +59,4 @@ jobs:
             docker rm medical-gas-transport-service
             docker rmi jayaintegrasihub/medical-gas-transport-service:latest
             docker pull jayaintegrasihub/medical-gas-transport-service:latest || echo "Failed to pull image"
-            docker run -t -d -p 5341:5341 --env-file .env.medical-gas-transport-service --name medical-gas-transport-service jayaintegrasihub/medical-gas-transport-service:latest
+            docker run -t -d -p 5341:5341 --env-file .env.medical-gas-transport-service --name medical-gas-transport-service --network oxygen-network jayaintegrasihub/medical-gas-transport-service:latest
