@@ -91,6 +91,11 @@ func (s *Service) handleOxygenLevel(topic string, payload []byte) {
 		return
 	}
 
+    device, err := s.getDeviceFromService(serialNumber)
+    if err != nil {
+        log.Printf("Error getting device info: %v", err)
+    }
+
 	var levelData OxygenLevelData
 	if err := json.Unmarshal(payload, &levelData); err != nil {
 		log.Printf("Error unmarshaling oxygen level data: %v", err)
@@ -106,9 +111,16 @@ func (s *Service) handleOxygenLevel(topic string, payload []byte) {
 				time, serial_number, level, device_uptime, device_temp, 
 				device_hum, device_long, device_lat, device_rssi, device_hw_ver, device_fw_ver, 
 				device_rd_ver, device_model, solar_batt_temp, solar_batt_level, solar_batt_status, 
-				solar_device_status, solar_load_status, solar_e_gen, solar_e_com
-			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
+				solar_device_status, solar_load_status, solar_e_gen, solar_e_com,
+				hospital_id, device_id
+			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
 		`
+
+        var hospitalID, deviceID string
+        if device != nil {
+			hospitalID = device.InstallationPointFlow.Hospital
+            deviceID = device.ID
+        }
 
 		err = s.writeToTimescaleDB(query,
 			levelData.Timestamp,
@@ -131,10 +143,12 @@ func (s *Service) handleOxygenLevel(topic string, payload []byte) {
 			pq.Array(levelData.Solar.SolarLoadStatus),
 			pq.Array(levelData.Solar.SolarEGen),
 			pq.Array(levelData.Solar.SolarECom),
+			hospitalID,
+			deviceID,
 		)
 
 		if err != nil {
-			log.Printf("Error writing oxygen level data to TimescaleDB: %v", err)
+			log.Printf("Error writing oxygen level data to TimescaleDB: %v", device)
 			return
 		}
 	} else {
@@ -173,6 +187,11 @@ func (s *Service) handleOxygenFlow(topic string, payload []byte) {
 		return
 	}
 
+    device, err := s.getDeviceFromService(serialNumber)
+    if err != nil {
+        log.Printf("Error getting device info: %v", err)
+	}
+
 	var flowData OxygenFlowData
 	if err := json.Unmarshal(payload, &flowData); err != nil {
 		log.Printf("Error unmarshaling oxygen flow data: %v", err)
@@ -187,9 +206,15 @@ func (s *Service) handleOxygenFlow(topic string, payload []byte) {
 			INSERT INTO sensor_flow (
 				time, serial_number, flow_rate, device_uptime, device_temp, 
 				device_hum, device_long, device_lat, device_rssi, device_hw_ver, device_fw_ver, 
-				device_rd_ver, device_model
-			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+				device_rd_ver, device_model,
+				hospital_id, device_id
+			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
 		`
+		var hospitalID, deviceID string
+        if device != nil {
+            hospitalID = device.InstallationPointFlow.Hospital
+            deviceID = device.ID
+        }
 
 		err = s.writeToTimescaleDB(query,
 			flowData.Timestamp,
@@ -205,6 +230,8 @@ func (s *Service) handleOxygenFlow(topic string, payload []byte) {
 			flowData.Device.DeviceFWVer,
 			flowData.Device.DeviceRDVer,
 			flowData.Device.DeviceModel,
+			hospitalID,
+			deviceID,
 		)
 
 		if err != nil {
@@ -293,15 +320,17 @@ func (s *Service) handleDeviceData(topic string, payload []byte) {
 	}
 }
 
-func (s *Service) getDeviceFromCacheOrService(deviceId string) (*services.Device, error) {
-	result, err := s.redisClient.Rdb.Get(s.ctx, "device/"+deviceId).Result()
+func (s *Service) getDeviceFromCacheOrService(serialNumber string) (*services.Device, error) {
+	result, err := s.redisClient.Rdb.Get(s.ctx, "device/"+serialNumber).Result()
 	if err == redis.Nil {
-		device, err := s.jayaClient.GetDevice(deviceId)
+		device, err := s.jayaClient.GetDevice(serialNumber)
 		if err != nil {
 			return nil, fmt.Errorf("error getting device from service: %w", err)
 		}
+		log.Printf("Device not found in cache, fetched from service: %s", serialNumber)
+
 		if jsonDevice, err := json.Marshal(device); err == nil {
-			s.redisClient.Rdb.Set(s.ctx, "device/"+deviceId, jsonDevice, 3*time.Hour)
+			s.redisClient.Rdb.Set(s.ctx, "device/"+serialNumber, jsonDevice, 3*time.Hour)
 		}
 		return device, nil
 	} else if err != nil {
@@ -312,7 +341,16 @@ func (s *Service) getDeviceFromCacheOrService(deviceId string) (*services.Device
 	if err := json.Unmarshal([]byte(result), &device); err != nil {
 		return nil, fmt.Errorf("error parsing device JSON: %w", err)
 	}
+
 	return &device, nil
+}
+
+func (s *Service) getDeviceFromService(serialNumber string) (*services.Device, error) {
+	device, err := s.jayaClient.GetDevice(serialNumber)
+	if err != nil {
+		return nil, fmt.Errorf("error getting device from service: %w", err)
+	}
+	return device, nil
 }
 
 func (s *Service) handleHealthData(t *eventTopic, payload []byte, device *services.Device) {
@@ -322,8 +360,8 @@ func (s *Service) handleHealthData(t *eventTopic, payload []byte, device *servic
 		return
 	}
 
-	device.Group["device"] = t.deviceId
-	device.Group["gateway"] = t.gatewayId
+	// device.Group["device"] = t.deviceId
+	// device.Group["gateway"] = t.gatewayId
 	fields := StructToMapReflect(healthData)
 	delete(fields, "ts")
 
@@ -334,8 +372,8 @@ func (s *Service) handleHealthData(t *eventTopic, payload []byte, device *servic
 	}
 	delete(fields, "modules")
 
-	point := influxdb2.NewPoint("deviceshealth", device.Group, fields, time.Unix(int64(healthData.Ts), 0))
-	s.writeToInfluxDB(device.Tenant.Name, point)
+	// point := influxdb2.NewPoint("deviceshealth", device.Group, fields, time.Unix(int64(healthData.Ts), 0))
+	// s.writeToInfluxDB(device.Tenant.Name, point)
 
 	log.Printf("Received device health data from %s", t.deviceId)
 }
@@ -347,16 +385,16 @@ func (s *Service) handleNodeData(t *eventTopic, payload []byte, device *services
 		return
 	}
 
-	device.Group["device"] = t.deviceId
-	device.Group["gateway"] = t.gatewayId
-	fields, err := convertToMap(nodeData.Data)
-	if err != nil {
-		log.Printf("Error converting node data to map: %v", err)
-		return
-	}
+	// device.Group["device"] = t.deviceId
+	// device.Group["gateway"] = t.gatewayId
+	// fields, err := convertToMap(nodeData.Data)
+	// if err != nil {
+	// 	log.Printf("Error converting node data to map: %v", err)
+	// 	return
+	// }
 
-	point := influxdb2.NewPoint(device.Type, device.Group, fields, time.Unix(int64(nodeData.Ts), 0))
-	s.writeToInfluxDB(device.Tenant.Name, point)
+	// point := influxdb2.NewPoint(device.Type, device.Group, fields, time.Unix(int64(nodeData.Ts), 0))
+	// s.writeToInfluxDB(device.Tenant.Name, point)
 
 	log.Printf("Received node data from %s", t.deviceId)
 }
