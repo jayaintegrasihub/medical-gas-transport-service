@@ -3,8 +3,9 @@ package services
 import (
 	"errors"
 	"fmt"
-	"strings"
 	"medical-gas-transport-service/config"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/go-resty/resty/v2"
@@ -25,45 +26,60 @@ type Bed struct {
 }
 
 type Device struct {
-	ID                  string              `json:"id"`
-	SerialNumber        string              `json:"serial_number"`
-	Alias               string              `json:"alias"`
-	Description         string              `json:"description"`
-	InstallationPointFlow InstallationPointFlow `json:"installation_point_flow"`
-	InstallationPointTank interface{}         `json:"installation_point_tank"`
-	CreatedAt            JSONTime           `json:"created_at"`
-	UpdatedAt            JSONTime           `json:"updated_at"`
+	ID                      string                  `json:"id"`
+	SerialNumber            string                  `json:"serial_number"`
+	Alias                   string                  `json:"alias"`
+	Description             string                  `json:"description"`
+	InstallationPointFlow   InstallationPointFlow   `json:"installation_point_flow"`
+	InstallationPointTank   InstallationPointTank   `json:"installation_point_tank"`
+	CreatedAt               JSONTime                `json:"created_at"`
+	UpdatedAt               JSONTime                `json:"updated_at"`
 }
 
 type DeviceResponse struct {
-    Status string `json:"status"`
-    Data   struct {
-        Device Device `json:"device,omitempty"`
-        ID string `json:"id,omitempty"`
-        SerialNumber string `json:"serial_number,omitempty"`
-        Alias string `json:"alias,omitempty"`
-        Description string `json:"description,omitempty"`
-        InstallationPointFlow InstallationPointFlow `json:"installation_point_flow,omitempty"`
-        InstallationPointTank interface{} `json:"installation_point_tank,omitempty"`
-        CreatedAt string `json:"created_at,omitempty"`
-        UpdatedAt string `json:"updated_at,omitempty"`
+    Status  string `json:"status"`
+    Data    struct {
+        Device                  Device                    `json:"device,omitempty"`
+        ID                      string                    `json:"id,omitempty"`
+        SerialNumber            string                    `json:"serial_number,omitempty"`
+        Alias                   string                    `json:"alias,omitempty"`
+        Description             string                    `json:"description,omitempty"`
+        InstallationPointFlow   InstallationPointFlow     `json:"installation_point_flow,omitempty"`
+        InstallationPointTank   InstallationPointTank     `json:"installation_point_tank,omitempty"`
+        CreatedAt               string                    `json:"created_at,omitempty"`
+        UpdatedAt               string                    `json:"updated_at,omitempty"`
     } `json:"data"`
 }
 
 type InstallationPointFlow struct {
-    ID string `json:"id"`
-    Hospital string `json:"hospital"`
-    SerialNumber string `json:"serial_number"`
-    Floor *string `json:"floor"`
-    Building *string `json:"building"`
-    Room *string `json:"room"`
-    Bed string `json:"bed"`
-    InstallationCode string `json:"installation_code"`
-    InstallationName string `json:"installation_name"`
-    InstallationType string `json:"installation_type"`
-    InstalledAt string `json:"installed_at"`
-    LastMaintenanceDate string `json:"last_maintenance_date"`
-    Device string `json:"device"`
+    ID                  string      `json:"id"`
+    Hospital            string      `json:"hospital"`
+    SerialNumber        string      `json:"serial_number"`
+    Floor               *string     `json:"floor"`
+    Building            *string     `json:"building"`
+    Room                *string     `json:"room"`
+    Bed                 string      `json:"bed"`
+    InstallationCode    string      `json:"installation_code"`
+    InstallationName    string      `json:"installation_name"`
+    InstallationType    string      `json:"installation_type"`
+    InstalledAt         string      `json:"installed_at"`
+    LastMaintenanceDate string      `json:"last_maintenance_date"`
+    Device              string      `json:"device"`
+}
+
+type InstallationPointTank struct {
+    ID                  string      `json:"id"`
+    Hospital            string      `json:"hospital"`
+    SerialNumber        string      `json:"serial_number"`
+    TankCode            string      `json:"tank_code"`
+    TankType            string      `json:"tank_type"`
+    Capacity            int         `json:"capacity"`
+    Status              string      `json:"status"`
+    InstalledAt         string      `json:"installed_at"`
+    LastMaintenanceDate string      `json:"last_maintenance_date"`
+    Device              string      `json:"device"`
+    CreatedAt           JSONTime    `json:"created_at"`
+    UpdatedAt           JSONTime    `json:"updated_at"`
 }
 
 type Tenant struct {
@@ -127,6 +143,20 @@ func (j *Jaya) GetDevice(serialNumber string) (*Device, error) {
             InstallationType: getString(ipfData, "installation_type"),
         }
     }
+
+    if iptData, ok := rawResponse.Data["installation_point_tank"].(map[string]interface{}); ok {
+        device.InstallationPointTank = InstallationPointTank{
+            ID: getString(iptData, "id"),
+            Hospital: getString(iptData, "hospital"),
+            SerialNumber: getString(iptData, "serial_number"),
+            TankCode: getString(iptData, "tank_code"),
+            TankType: getString(iptData, "tank_type"),
+            Capacity: getInt(iptData, "capacity"),
+            Status: getString(iptData, "status"),
+            InstalledAt: getString(iptData, "installed_at"),
+            LastMaintenanceDate: getString(iptData, "last_maintenance_date"),
+        }
+    }
     
     return device, nil
 }
@@ -154,6 +184,22 @@ func (j *Jaya) Provision(id string) (*JayaProvisionResponse, error) {
 
 	result := resp.Result().(*JayaProvisionResponse)
 	return result, nil
+}
+
+func getInt(data map[string]interface{}, key string) int {
+    if val, ok := data[key]; ok {
+        switch v := val.(type) {
+        case float64:
+            return int(v)
+        case int:
+            return v
+        case string:
+            if i, err := strconv.Atoi(v); err == nil {
+                return i
+            }
+        }
+    }
+    return 0
 }
 
 func (j *JSONTime) UnmarshalJSON(b []byte) error {

@@ -118,7 +118,7 @@ func (s *Service) handleOxygenLevel(topic string, payload []byte) {
 
         var hospitalID, deviceID string
         if device != nil {
-			hospitalID = device.InstallationPointFlow.Hospital
+			hospitalID = device.InstallationPointTank.Hospital
             deviceID = device.ID
         }
 
