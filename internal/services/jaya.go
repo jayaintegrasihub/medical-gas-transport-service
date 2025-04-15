@@ -101,7 +101,7 @@ var ErrDeviceNotFound = errors.New("Device Not Found")
 func NewJayaService(conf config.JayaApiConfig) *Jaya {
 	client := resty.New()
 	client.SetBaseURL(conf.URL)
-	// client.SetHeader("api-key", conf.Token)
+	client.SetHeader("api-key", conf.Token)
 
 	return &Jaya{client: client}
 }
