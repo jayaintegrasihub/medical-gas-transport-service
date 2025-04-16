@@ -148,7 +148,7 @@ func (s *Service) handleOxygenLevel(topic string, payload []byte) {
 		)
 
 		if err != nil {
-			log.Printf("Error writing oxygen level data to TimescaleDB: %v", device)
+			log.Printf("Error writing oxygen level data to TimescaleDB: %v", err)
 			return
 		}
 	} else {
