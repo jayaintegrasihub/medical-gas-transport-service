@@ -33,6 +33,10 @@ jobs:
             type=semver,pattern=latest
             type=raw,value=latest
 
+      - name: create environment production
+        run: |
+          echo "${{secrets.ENV_FILE_DEVELOPMENT}}" > .env
+
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
@@ -47,10 +51,6 @@ jobs:
     name: Push docker to server
     runs-on: ubuntu-latest
     steps:
-      - name: create environment production
-        run: |
-          echo "${{secrets.ENV_FILE_DEVELOPMENT}}" > .env
-          
       - name: executing remote ssh command using password
         uses: appleboy/ssh-action@v1.2.1
         with:
