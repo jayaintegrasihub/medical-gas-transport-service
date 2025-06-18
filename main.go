@@ -56,7 +56,8 @@ func main() {
 	log.Printf("Setup Influxdb Service")
 	influxClient, err := services.NewInfluxClient(ctx, cfg.InfluxDB)
 	if err != nil {
-		log.Fatalf("Error creating InfluxDB client: %v", err)
+		log.Printf("Error creating InfluxDB client: %v. Skipping InfluxDB setup.", err)
+		influxClient = nil
 	}
 
 	// Create Redis client
