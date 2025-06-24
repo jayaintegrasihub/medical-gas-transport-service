@@ -53,6 +53,7 @@ func (s *Service) subscribeToMQTT() {
 			{Topic: "$share/g1/provisioning", QoS: 1},
 			{Topic: "$share/g1/JI/v2/+/level", QoS: 1},
 			{Topic: "$share/g1/JI/v2/+/flow", QoS: 1},
+			{Topic: "$share/g1/JI/v2/+/pressure", QoS: 1},
 		},
 	})
 }
@@ -69,6 +70,8 @@ func (s *Service) addPublishHandler() {
 			s.handleOxygenLevel(topic, payload)
 		case strings.HasPrefix(topic, "JI/v2/") && strings.HasSuffix(topic, "/flow"):
 			s.handleOxygenFlow(topic, payload)
+		case strings.HasPrefix(topic, "JI/v2/") && strings.HasSuffix(topic, "/pressure"):
+			s.handleOxygenPressure(topic, payload)
 		default:
 			s.handleDeviceData(topic, payload)
 		}
@@ -264,6 +267,166 @@ func (s *Service) handleOxygenFlow(topic string, payload []byte) {
 	log.Println("Data processed and published:", flowData)
 
 	log.Printf("Successfully stored oxygen flow data for device %s", flowData.SerialNumber)
+}
+
+func (s *Service) handleOxygenPressure(topic string, payload []byte) {
+	serialNumber, err := extractSerialNumberFromTopic(topic)
+	if err != nil {
+		log.Printf("Error extracting serial number: %v", err)
+		return
+	}
+
+	device, err := s.getDeviceFromService(serialNumber)
+	if err != nil {
+		log.Printf("Error getting device info: %v", err)
+	}
+
+	var pressureData OxygenPressureData
+	if err := json.Unmarshal(payload, &pressureData); err != nil {
+		log.Printf("Error unmarshaling oxygen pressure data: %v", err)
+		return
+	}
+
+	pressureData.SerialNumber = serialNumber
+	pressureData.Timestamp = time.Unix(pressureData.Ts, 0)
+
+	if s.cfg.TimescaleDB.Enabled {
+		var (
+			nitrousOxidePressure, nitrousOxideHighLimit, nitrousOxideLowLimit             float64
+			oxygenPressure, oxygenHighLimit, oxygenLowLimit                               float64
+			medicalAirPressure, medicalAirHighLimit, medicalAirLowLimit                   float64
+			vacuumPressure, vacuumHighLimit, vacuumLowLimit                               float64
+			nitrousOxideConnection, oxygenConnection, medicalAirConnection, vacuumConnection int
+			nitrousOxideEnable, oxygenEnable, medicalAirEnable, vacuumEnable             bool
+		)
+
+		for _, data := range pressureData.Data {
+			switch data.Measurement {
+			case "nitrous oxide":
+				nitrousOxidePressure = data.Value
+				nitrousOxideConnection = data.Connection
+				nitrousOxideEnable = data.Enable
+				nitrousOxideHighLimit = data.HighLimit
+				nitrousOxideLowLimit = data.LowLimit
+			case "oxygen":
+				oxygenPressure = data.Value
+				oxygenConnection = data.Connection
+				oxygenEnable = data.Enable
+				oxygenHighLimit = data.HighLimit
+				oxygenLowLimit = data.LowLimit
+			case "medical air":
+				medicalAirPressure = data.Value
+				medicalAirConnection = data.Connection
+				medicalAirEnable = data.Enable
+				medicalAirHighLimit = data.HighLimit
+				medicalAirLowLimit = data.LowLimit
+			case "vacuum":
+				vacuumPressure = data.Value
+				vacuumConnection = data.Connection
+				vacuumEnable = data.Enable
+				vacuumHighLimit = data.HighLimit
+				vacuumLowLimit = data.LowLimit
+			}
+		}
+
+		query := `
+			INSERT INTO sensor_pressure (
+				time, serial_number, 
+				nitrous_oxide_value, nitrous_oxide_connection, nitrous_oxide_enable, 
+				nitrous_oxide_high_limit, nitrous_oxide_low_limit,
+				oxygen_value, oxygen_connection, oxygen_enable, 
+				oxygen_high_limit, oxygen_low_limit,
+				medical_air_value, medical_air_connection, medical_air_enable, 
+				medical_air_high_limit, medical_air_low_limit,
+				vacuum_value, vacuum_connection, vacuum_enable, 
+				vacuum_high_limit, vacuum_low_limit,
+				device_uptime, device_temp, device_hum, device_long, device_lat, 
+				device_rssi, device_hw_ver, device_fw_ver, device_rd_ver, device_model,
+				hospital_id, device_id
+			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34)
+		`
+
+		var hospitalID, deviceID string
+		if device != nil {
+			hospitalID = device.InstallationPointPressure.Hospital
+			deviceID = device.ID
+		}
+
+		err = s.writeToTimescaleDB(query,
+			pressureData.Timestamp,
+			pressureData.SerialNumber,
+			nitrousOxidePressure,
+			nitrousOxideConnection,
+			nitrousOxideEnable,
+			nitrousOxideHighLimit,
+			nitrousOxideLowLimit,
+			oxygenPressure,
+			oxygenConnection,
+			oxygenEnable,
+			oxygenHighLimit,
+			oxygenLowLimit,
+			medicalAirPressure,
+			medicalAirConnection,
+			medicalAirEnable,
+			medicalAirHighLimit,
+			medicalAirLowLimit,
+			vacuumPressure,
+			vacuumConnection,
+			vacuumEnable,
+			vacuumHighLimit,
+			vacuumLowLimit,
+			pressureData.Device.DeviceUptime,
+			pressureData.Device.DeviceTemp,
+			pressureData.Device.DeviceHum,
+			pressureData.Device.DeviceLong,
+			pressureData.Device.DeviceLat,
+			pressureData.Device.DeviceRSSI,
+			pressureData.Device.DeviceHWVer,
+			pressureData.Device.DeviceFWVer,
+			pressureData.Device.DeviceRDVer,
+			pressureData.Device.DeviceModel,
+			hospitalID,
+			deviceID,
+		)
+
+		if err != nil {
+			log.Printf("Error writing oxygen pressure data to TimescaleDB: %v", err)
+			return
+		}
+	} else {
+		tags := map[string]string{
+			"serial_number": pressureData.SerialNumber,
+		}
+
+		fields := map[string]interface{}{
+			"device_uptime": pressureData.Device.DeviceUptime,
+			"device_temp":   pressureData.Device.DeviceTemp,
+			"device_hum":    pressureData.Device.DeviceHum,
+			"device_rssi":   pressureData.Device.DeviceRSSI,
+		}
+
+		// Add pressure values for each gas type
+		for _, data := range pressureData.Data {
+			gasType := strings.ReplaceAll(data.Measurement, " ", "_")
+			fields[gasType+"_pressure"] = data.Value
+			fields[gasType+"_connection"] = data.Connection
+			fields[gasType+"_enable"] = data.Enable
+			fields[gasType+"_high_limit"] = data.HighLimit
+			fields[gasType+"_low_limit"] = data.LowLimit
+		}
+
+		point := influxdb2.NewPoint("oxygen_pressure", tags, fields, pressureData.Timestamp)
+		s.writeToInfluxDB("oxygen_metrics", point)
+	}
+
+	event := map[string]interface{}{
+		"pressure": pressureData,
+	}
+	eventJSON, _ := json.Marshal(event)
+	s.redisClient.Rdb.Publish(s.ctx, "oxygen:updates", eventJSON)
+	log.Println("Pressure data processed and published:", pressureData)
+
+	log.Printf("Successfully stored oxygen pressure data for device %s", pressureData.SerialNumber)
 }
 
 func (s *Service) handleProvisioning(payload []byte) {

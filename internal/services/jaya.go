@@ -26,28 +26,30 @@ type Bed struct {
 }
 
 type Device struct {
-	ID                      string                  `json:"id"`
-	SerialNumber            string                  `json:"serial_number"`
-	Alias                   string                  `json:"alias"`
-	Description             string                  `json:"description"`
-	InstallationPointFlow   InstallationPointFlow   `json:"installation_point_flow"`
-	InstallationPointTank   InstallationPointTank   `json:"installation_point_tank"`
-	CreatedAt               JSONTime                `json:"created_at"`
-	UpdatedAt               JSONTime                `json:"updated_at"`
+	ID                          string                      `json:"id"`
+	SerialNumber                string                      `json:"serial_number"`
+	Alias                       string                      `json:"alias"`
+	Description                 string                      `json:"description"`
+	InstallationPointFlow       InstallationPointFlow       `json:"installation_point_flow"`
+	InstallationPointTank       InstallationPointTank       `json:"installation_point_tank"`
+	InstallationPointPressure   InstallationPointPressure   `json:"installation_point_pressure"`
+	CreatedAt                   JSONTime                    `json:"created_at"`
+	UpdatedAt                   JSONTime                    `json:"updated_at"`
 }
 
 type DeviceResponse struct {
     Status  string `json:"status"`
     Data    struct {
-        Device                  Device                    `json:"device,omitempty"`
-        ID                      string                    `json:"id,omitempty"`
-        SerialNumber            string                    `json:"serial_number,omitempty"`
-        Alias                   string                    `json:"alias,omitempty"`
-        Description             string                    `json:"description,omitempty"`
-        InstallationPointFlow   InstallationPointFlow     `json:"installation_point_flow,omitempty"`
-        InstallationPointTank   InstallationPointTank     `json:"installation_point_tank,omitempty"`
-        CreatedAt               string                    `json:"created_at,omitempty"`
-        UpdatedAt               string                    `json:"updated_at,omitempty"`
+        Device                      Device                    `json:"device,omitempty"`
+        ID                          string                    `json:"id,omitempty"`
+        SerialNumber                string                    `json:"serial_number,omitempty"`
+        Alias                       string                    `json:"alias,omitempty"`
+        Description                 string                    `json:"description,omitempty"`
+        InstallationPointFlow       InstallationPointFlow     `json:"installation_point_flow,omitempty"`
+        InstallationPointTank       InstallationPointTank     `json:"installation_point_tank,omitempty"`
+        InstallationPointPressure   InstallationPointPressure `json:"installation_point_pressure,omitempty"`
+        CreatedAt                   string                    `json:"created_at,omitempty"`
+        UpdatedAt                   string                    `json:"updated_at,omitempty"`
     } `json:"data"`
 }
 
@@ -80,6 +82,24 @@ type InstallationPointTank struct {
     Device              string      `json:"device"`
     CreatedAt           JSONTime    `json:"created_at"`
     UpdatedAt           JSONTime    `json:"updated_at"`
+}
+
+type InstallationPointPressure struct {
+    ID                  string    `json:"id"`
+    Hospital            string    `json:"hospital"`
+    SerialNumber        string    `json:"serial_number"`
+    Floor               *string   `json:"floor"`
+    Building            *string   `json:"building"`
+    Room                *string   `json:"room"`
+    GasTypes            []string  `json:"gas_types"`
+    PressureUnit        string    `json:"pressure_unit"`
+    Status              string    `json:"status"`
+    InstalledAt         string    `json:"installed_at"`
+    LastMaintenanceDate string    `json:"last_maintenance_date"`
+    Device              string    `json:"device"`
+    DeviceThreshold     string    `json:"device_threshold"`
+    CreatedAt           JSONTime  `json:"created_at"`
+    UpdatedAt           JSONTime  `json:"updated_at"`
 }
 
 type Tenant struct {
@@ -155,6 +175,48 @@ func (j *Jaya) GetDevice(serialNumber string) (*Device, error) {
             Status: getString(iptData, "status"),
             InstalledAt: getString(iptData, "installed_at"),
             LastMaintenanceDate: getString(iptData, "last_maintenance_date"),
+        }
+    }
+
+    if ippData, ok := rawResponse.Data["installation_point_pressure"].(map[string]interface{}); ok {
+        var gasTypes []string
+        if gt, ok := ippData["gas_types"].([]interface{}); ok {
+            for _, g := range gt {
+                if s, ok := g.(string); ok {
+                    gasTypes = append(gasTypes, s)
+                }
+            }
+        }
+        var floor, building, room *string
+        if val, ok := ippData["floor"]; ok {
+            if strVal, ok := val.(string); ok && strVal != "" {
+            floor = &strVal
+            }
+        }
+        if val, ok := ippData["building"]; ok {
+            if strVal, ok := val.(string); ok && strVal != "" {
+            building = &strVal
+            }
+        }
+        if val, ok := ippData["room"]; ok {
+            if strVal, ok := val.(string); ok && strVal != "" {
+            room = &strVal
+            }
+        }
+        device.InstallationPointPressure = InstallationPointPressure{
+            ID: getString(ippData, "id"),
+            Hospital: getString(ippData, "hospital"),
+            SerialNumber: getString(ippData, "serial_number"),
+            Floor: floor,
+            Building: building,
+            Room: room,
+            GasTypes: gasTypes,
+            PressureUnit: getString(ippData, "pressure_unit"),
+            Status: getString(ippData, "status"),
+            InstalledAt: getString(ippData, "installed_at"),
+            LastMaintenanceDate: getString(ippData, "last_maintenance_date"),
+            Device: getString(ippData, "device"),
+            DeviceThreshold: getString(ippData, "device_threshold"),
         }
     }
     
