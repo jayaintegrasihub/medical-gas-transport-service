@@ -67,11 +67,11 @@ func (s *Service) addPublishHandler() {
 		case topic == "provisioning":
 			s.handleProvisioning(payload)
 		case strings.HasPrefix(topic, "JI/v2/") && strings.HasSuffix(topic, "/level"):
-			s.handleOxygenLevel(topic, payload)
+			s.handleSensorLevel(topic, payload)
 		case strings.HasPrefix(topic, "JI/v2/") && strings.HasSuffix(topic, "/flow"):
-			s.handleOxygenFlow(topic, payload)
+			s.handleSensorFlow(topic, payload)
 		case strings.HasPrefix(topic, "JI/v2/") && strings.HasSuffix(topic, "/pressure"):
-			s.handleOxygenPressure(topic, payload)
+			s.handleSensorPressure(topic, payload)
 		default:
 			s.handleDeviceData(topic, payload)
 		}
@@ -87,21 +87,21 @@ func extractSerialNumberFromTopic(topic string) (string, error) {
 	return parts[2], nil
 }
 
-func (s *Service) handleOxygenLevel(topic string, payload []byte) {
+func (s *Service) handleSensorLevel(topic string, payload []byte) {
 	serialNumber, err := extractSerialNumberFromTopic(topic)
 	if err != nil {
 		log.Printf("Error extracting serial number: %v", err)
 		return
 	}
 
-    device, err := s.getDeviceFromService(serialNumber)
-    if err != nil {
-        log.Printf("Error getting device info: %v", err)
-    }
+	device, err := s.getDeviceFromService(serialNumber)
+	if err != nil {
+		log.Printf("Error getting device info: %v", err)
+	}
 
-	var levelData OxygenLevelData
+	var levelData SensorLevelData
 	if err := json.Unmarshal(payload, &levelData); err != nil {
-		log.Printf("Error unmarshaling oxygen level data: %v", err)
+		log.Printf("Error unmarshaling sensor level data: %v", err)
 		return
 	}
 
@@ -119,11 +119,11 @@ func (s *Service) handleOxygenLevel(topic string, payload []byte) {
 			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
 		`
 
-        var hospitalID, deviceID string
-        if device != nil {
+		var hospitalID, deviceID string
+		if device != nil {
 			hospitalID = device.InstallationPointTank.Hospital
-            deviceID = device.ID
-        }
+			deviceID = device.ID
+		}
 
 		err = s.writeToTimescaleDB(query,
 			levelData.Timestamp,
@@ -151,7 +151,7 @@ func (s *Service) handleOxygenLevel(topic string, payload []byte) {
 		)
 
 		if err != nil {
-			log.Printf("Error writing oxygen level data to TimescaleDB: %v", err)
+			log.Printf("Error writing sensor level data to TimescaleDB: %v", err)
 			return
 		}
 	} else {
@@ -174,55 +174,64 @@ func (s *Service) handleOxygenLevel(topic string, payload []byte) {
 	}
 
 	event := map[string]interface{}{
-		"level":  levelData,
+		"level": levelData,
 	}
 	eventJSON, _ := json.Marshal(event)
 	s.redisClient.Rdb.Publish(s.ctx, "oxygen:updates", eventJSON)
 	log.Println("Data processed and published:", levelData)
 
-	log.Printf("Successfully stored oxygen level data for device %s", levelData.SerialNumber)
+	log.Printf("Successfully stored sensor level data for device %s", levelData.SerialNumber)
 }
 
-func (s *Service) handleOxygenFlow(topic string, payload []byte) {
+func (s *Service) handleSensorFlow(topic string, payload []byte) {
 	serialNumber, err := extractSerialNumberFromTopic(topic)
 	if err != nil {
 		log.Printf("Error extracting serial number: %v", err)
 		return
 	}
 
-    device, err := s.getDeviceFromService(serialNumber)
-    if err != nil {
-        log.Printf("Error getting device info: %v", err)
+	device, err := s.getDeviceFromService(serialNumber)
+	if err != nil {
+		log.Printf("Error getting device info: %v", err)
 	}
 
-	var flowData OxygenFlowData
+	var flowData SensorFlowData
 	if err := json.Unmarshal(payload, &flowData); err != nil {
-		log.Printf("Error unmarshaling oxygen flow data: %v", err)
+		log.Printf("Error unmarshaling sensor flow data: %v", err)
 		return
 	}
 
 	flowData.SerialNumber = serialNumber
 	flowData.Timestamp = time.Unix(flowData.Ts, 0)
 
+	totalVolume := (flowData.VHi * 65536) + (flowData.VLo) + (flowData.VDec / 1000)
+	flowRate := ((flowData.FRateHi * 65536) + flowData.FRateLo) / 1000
+
 	if s.cfg.TimescaleDB.Enabled {
 		query := `
 			INSERT INTO sensor_flow (
-				time, serial_number, flow_rate, device_uptime, device_temp, 
+				time, serial_number, total_volume, volume_high, volume_low, volume_decimal,
+				flow_rate, flow_rate_high, flow_rate_low, device_uptime, device_temp, 
 				device_hum, device_long, device_lat, device_rssi, device_hw_ver, device_fw_ver, 
-				device_rd_ver, device_model,
-				hospital_id, device_id
-			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+				device_rd_ver, device_model, hospital_id, device_id
+			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
 		`
 		var hospitalID, deviceID string
-        if device != nil {
-            hospitalID = device.InstallationPointFlow.Hospital
-            deviceID = device.ID
-        }
+		if device != nil {
+			hospitalID = device.InstallationPointFlow.Hospital
+			deviceID = device.ID
+		}
 
 		err = s.writeToTimescaleDB(query,
 			flowData.Timestamp,
 			flowData.SerialNumber,
-			flowData.FlowRate,
+			totalVolume,
+			flowData.VHi,
+			flowData.VLo,
+			flowData.VDec,
+			flowRate,
+			flowData.FRateHi,
+			flowData.FRateLo,
 			flowData.Device.DeviceUptime,
 			flowData.Device.DeviceTemp,
 			flowData.Device.DeviceHum,
@@ -238,7 +247,7 @@ func (s *Service) handleOxygenFlow(topic string, payload []byte) {
 		)
 
 		if err != nil {
-			log.Printf("Error writing oxygen flow data to TimescaleDB: %v", err)
+			log.Printf("Error writing sensor flow data to TimescaleDB: %v", err)
 			return
 		}
 	} else {
@@ -248,11 +257,17 @@ func (s *Service) handleOxygenFlow(topic string, payload []byte) {
 		}
 
 		fields := map[string]interface{}{
-			"flow_rate":        flowData.FlowRate,
-			"device_uptime":    flowData.Device.DeviceUptime,
-			"device_temp":      flowData.Device.DeviceTemp,
-			"device_hum":       flowData.Device.DeviceHum,
-			"device_rssi":      flowData.Device.DeviceRSSI,
+			"total_volume":   totalVolume,
+			"volume_high":    flowData.VHi,
+			"volume_low":     flowData.VLo,
+			"volume_decimal": flowData.VDec,
+			"flow_rate":      flowRate,
+			"flow_rate_high": flowData.FRateHi,
+			"flow_rate_low":  flowData.FRateLo,
+			"device_uptime":  flowData.Device.DeviceUptime,
+			"device_temp":    flowData.Device.DeviceTemp,
+			"device_hum":     flowData.Device.DeviceHum,
+			"device_rssi":    flowData.Device.DeviceRSSI,
 		}
 
 		point := influxdb2.NewPoint("oxygen_flow", tags, fields, flowData.Timestamp)
@@ -260,16 +275,16 @@ func (s *Service) handleOxygenFlow(topic string, payload []byte) {
 	}
 
 	event := map[string]interface{}{
-		"flow":  flowData,
+		"flow": flowData,
 	}
 	eventJSON, _ := json.Marshal(event)
 	s.redisClient.Rdb.Publish(s.ctx, "oxygen:updates", eventJSON)
 	log.Println("Data processed and published:", flowData)
 
-	log.Printf("Successfully stored oxygen flow data for device %s", flowData.SerialNumber)
+	log.Printf("Successfully stored sensor flow data for device %s", flowData.SerialNumber)
 }
 
-func (s *Service) handleOxygenPressure(topic string, payload []byte) {
+func (s *Service) handleSensorPressure(topic string, payload []byte) {
 	serialNumber, err := extractSerialNumberFromTopic(topic)
 	if err != nil {
 		log.Printf("Error extracting serial number: %v", err)
@@ -281,9 +296,9 @@ func (s *Service) handleOxygenPressure(topic string, payload []byte) {
 		log.Printf("Error getting device info: %v", err)
 	}
 
-	var pressureData OxygenPressureData
+	var pressureData SensorPressureData
 	if err := json.Unmarshal(payload, &pressureData); err != nil {
-		log.Printf("Error unmarshaling oxygen pressure data: %v", err)
+		log.Printf("Error unmarshaling sensor pressure data: %v", err)
 		return
 	}
 
@@ -292,12 +307,12 @@ func (s *Service) handleOxygenPressure(topic string, payload []byte) {
 
 	if s.cfg.TimescaleDB.Enabled {
 		var (
-			nitrousOxidePressure, nitrousOxideHighLimit, nitrousOxideLowLimit             float64
-			oxygenPressure, oxygenHighLimit, oxygenLowLimit                               float64
-			medicalAirPressure, medicalAirHighLimit, medicalAirLowLimit                   float64
-			vacuumPressure, vacuumHighLimit, vacuumLowLimit                               float64
+			nitrousOxidePressure, nitrousOxideHighLimit, nitrousOxideLowLimit                float64
+			oxygenPressure, oxygenHighLimit, oxygenLowLimit                                  float64
+			medicalAirPressure, medicalAirHighLimit, medicalAirLowLimit                      float64
+			vacuumPressure, vacuumHighLimit, vacuumLowLimit                                  float64
 			nitrousOxideConnection, oxygenConnection, medicalAirConnection, vacuumConnection int
-			nitrousOxideEnable, oxygenEnable, medicalAirEnable, vacuumEnable             bool
+			nitrousOxideEnable, oxygenEnable, medicalAirEnable, vacuumEnable                 bool
 		)
 
 		for _, data := range pressureData.Data {
@@ -390,7 +405,7 @@ func (s *Service) handleOxygenPressure(topic string, payload []byte) {
 		)
 
 		if err != nil {
-			log.Printf("Error writing oxygen pressure data to TimescaleDB: %v", err)
+			log.Printf("Error writing sensor pressure data to TimescaleDB: %v", err)
 			return
 		}
 	} else {
@@ -426,7 +441,7 @@ func (s *Service) handleOxygenPressure(topic string, payload []byte) {
 	s.redisClient.Rdb.Publish(s.ctx, "oxygen:updates", eventJSON)
 	log.Println("Pressure data processed and published:", pressureData)
 
-	log.Printf("Successfully stored oxygen pressure data for device %s", pressureData.SerialNumber)
+	log.Printf("Successfully stored sensor pressure data for device %s", pressureData.SerialNumber)
 }
 
 func (s *Service) handleProvisioning(payload []byte) {

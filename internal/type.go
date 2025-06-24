@@ -1,7 +1,6 @@
 package internal
 
 import (
-	"fmt"
 	"time"
 )
 
@@ -61,45 +60,49 @@ type IOData struct {
 }
 
 type Device struct {
-	DeviceUptime  int     `json:"uptime"`
-	DeviceTemp    float64 `json:"temp"`
-	DeviceHum     float64 `json:"hum"`
-	DeviceLong    float64 `json:"long"`
-	DeviceLat     float64 `json:"lat"`
-	DeviceRSSI    int     `json:"rssi"`
-	DeviceHWVer   string  `json:"hwVer"`
-	DeviceFWVer   string  `json:"fwVer"`
-	DeviceRDVer   string  `json:"rdVer"`
-	DeviceModel   string  `json:"model"`
+	DeviceUptime int     `json:"uptime"`
+	DeviceTemp   float64 `json:"temp"`
+	DeviceHum    float64 `json:"hum"`
+	DeviceLong   float64 `json:"long"`
+	DeviceLat    float64 `json:"lat"`
+	DeviceRSSI   int     `json:"rssi"`
+	DeviceHWVer  string  `json:"hwVer"`
+	DeviceFWVer  string  `json:"fwVer"`
+	DeviceRDVer  string  `json:"rdVer"`
+	DeviceModel  string  `json:"model"`
 }
 
-type OxygenLevelData struct {
-	Timestamp          time.Time `json:"-"`
-	SerialNumber       string    `json:"-"`
-	
-	Ts                int64     `json:"ts"`
-	Device            Device	`json:"device"`
-	
-	Level             float64   `json:"level"`
-	Solar             struct {
-		SolarBattStatus    []string  `json:"battStat"`
-		SolarDeviceStatus  []string  `json:"deviceStat"`
-		SolarLoadStatus    []string  `json:"loadStat"`
-		SolarBattTemp      int       `json:"battTemp"`
-		SolarBattLevel     int       `json:"battLevel"`
-		SolarEGen          []int     `json:"eGen"`
-		SolarECom          []int     `json:"eCom"`
+type SensorLevelData struct {
+	Timestamp    time.Time `json:"-"`
+	SerialNumber string    `json:"-"`
+
+	Ts     int64  `json:"ts"`
+	Device Device `json:"device"`
+
+	Level float64 `json:"level"`
+	Solar struct {
+		SolarBattStatus   []string `json:"battStat"`
+		SolarDeviceStatus []string `json:"deviceStat"`
+		SolarLoadStatus   []string `json:"loadStat"`
+		SolarBattTemp     int      `json:"battTemp"`
+		SolarBattLevel    int      `json:"battLevel"`
+		SolarEGen         []int    `json:"eGen"`
+		SolarECom         []int    `json:"eCom"`
 	} `json:"solar"`
 }
 
-type OxygenFlowData struct {
-	Timestamp          		time.Time `json:"-"`
-	SerialNumber       		string    `json:"-"`
-	
-	Ts                	int64     	`json:"ts"`
-	Device            	Device		`json:"device"`
-	
-	FlowRate          	float64   `json:"flow_rate"`
+type SensorFlowData struct {
+	Timestamp    time.Time `json:"-"`
+	SerialNumber string    `json:"-"`
+	Ts           int64     `json:"ts"`
+	Device       Device    `json:"device"`
+	TotalVolume  float64   `json:"-"` // (vHi*65536) + (vLo) + (vDec/1000)
+	VHi          float64   `json:"vHi"`
+	VLo          float64   `json:"vLo"`
+	VDec         float64   `json:"vDec"`
+	FlowRate     float64   `json:"-"` // ((fRateHi * 65536) + fRateLo)/1000
+	FRateHi      float64   `json:"fRateHi"`
+	FRateLo      float64   `json:"fRateLo"`
 }
 
 type PressureData struct {
@@ -111,28 +114,10 @@ type PressureData struct {
 	LowLimit    float64 `json:"low_limit"`
 }
 
-type OxygenPressureData struct {
+type SensorPressureData struct {
 	Ts           int64          `json:"ts"`
 	Device       Device         `json:"device"`
 	Data         []PressureData `json:"data"`
 	SerialNumber string         `json:"-"`
 	Timestamp    time.Time      `json:"-"`
-}
-
-func convertToMap(dataArray []IOData) (map[string]interface{}, error) {
-	m := make(map[string]interface{})
-	if len(dataArray) == 0 {
-		return nil, fmt.Errorf("array length is 0")
-	}
-
-	for _, data := range dataArray {
-		if len(data.Tag) > 0 {
-			m[data.Tag] = data.Value
-		}
-	}
-
-	if len(m) == 0 {
-		return nil, fmt.Errorf("data map is empty")
-	}
-	return m, nil
 }
