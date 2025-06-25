@@ -121,3 +121,8 @@ type SensorPressureData struct {
 	SerialNumber string         `json:"-"`
 	Timestamp    time.Time      `json:"-"`
 }
+
+type MqttMessage struct {
+	Topic   string
+	Payload []byte
+}
