@@ -60,16 +60,17 @@ type IOData struct {
 }
 
 type Device struct {
-	DeviceUptime int     `json:"uptime"`
-	DeviceTemp   float64 `json:"temp"`
-	DeviceHum    float64 `json:"hum"`
-	DeviceLong   float64 `json:"long"`
-	DeviceLat    float64 `json:"lat"`
-	DeviceRSSI   int     `json:"rssi"`
-	DeviceHWVer  string  `json:"hwVer"`
-	DeviceFWVer  string  `json:"fwVer"`
-	DeviceRDVer  string  `json:"rdVer"`
-	DeviceModel  string  `json:"model"`
+	DeviceUptime 	int     `json:"uptime"`
+	DeviceTemp   	float64 `json:"temp"`
+	DeviceHum    	float64 `json:"hum"`
+	DeviceLong   	float64 `json:"long"`
+	DeviceLat    	float64 `json:"lat"`
+	DeviceRSSI   	int     `json:"rssi"`
+	DeviceHWVer  	string  `json:"hwVer"`
+	DeviceFWVer  	string  `json:"fwVer"`
+	DeviceRDVer  	string  `json:"rdVer"`
+	DeviceModel  	string  `json:"model"`
+	DeviceMemUsage 	string  `json:"memory"`
 }
 
 type SensorLevelData struct {

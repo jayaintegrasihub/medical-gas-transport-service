@@ -144,10 +144,10 @@ func (s *Service) handleSensorLevel(topic string, payload []byte) {
 			INSERT INTO sensor_level (
 				time, serial_number, level, device_uptime, device_temp, 
 				device_hum, device_long, device_lat, device_rssi, device_hw_ver, device_fw_ver, 
-				device_rd_ver, device_model, solar_batt_temp, solar_batt_level, solar_batt_status, 
+				device_rd_ver, device_model, device_mem_usage, solar_batt_temp, solar_batt_level, solar_batt_status, 
 				solar_device_status, solar_load_status, solar_e_gen, solar_e_com,
 				hospital_id, device_id
-			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
+			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)
 		`
 
 		var hospitalID, deviceID string
@@ -170,6 +170,7 @@ func (s *Service) handleSensorLevel(topic string, payload []byte) {
 			levelData.Device.DeviceFWVer,
 			levelData.Device.DeviceRDVer,
 			levelData.Device.DeviceModel,
+			levelData.Device.DeviceMemUsage,
 			levelData.Solar.SolarBattTemp,
 			levelData.Solar.SolarBattLevel,
 			pq.Array(levelData.Solar.SolarBattStatus),
@@ -196,6 +197,7 @@ func (s *Service) handleSensorLevel(topic string, payload []byte) {
 			"device_temp":      levelData.Device.DeviceTemp,
 			"device_hum":       levelData.Device.DeviceHum,
 			"device_rssi":      levelData.Device.DeviceRSSI,
+			"device_mem_usage": levelData.Device.DeviceMemUsage,
 			"solar_batt_temp":  levelData.Solar.SolarBattTemp,
 			"solar_batt_level": levelData.Solar.SolarBattLevel,
 		}
