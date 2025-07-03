@@ -70,7 +70,7 @@ type Device struct {
 	DeviceFWVer  	string  `json:"fwVer"`
 	DeviceRDVer  	string  `json:"rdVer"`
 	DeviceModel  	string  `json:"model"`
-	DeviceMemUsage 	string  `json:"memory"`
+	DeviceMemUsage 	int		`json:"memory"`
 }
 
 type SensorLevelData struct {
