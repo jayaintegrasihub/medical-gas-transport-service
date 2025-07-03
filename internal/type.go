@@ -82,13 +82,13 @@ type SensorLevelData struct {
 	Level float64 `json:"level"`
 	Solar struct {
 		SolarBattStatus   []string `json:"battStat"`
-		SolarDeviceStatus []string `json:"deviceStat"`
+		SolarDeviceStatus []string `json:"solarStat"`
 		SolarLoadStatus   []string `json:"loadStat"`
 		SolarBattTemp     int      `json:"battTemp"`
 		SolarBattLevel    int      `json:"battLevel"`
 		SolarEGen         []int    `json:"eGen"`
 		SolarECom         []int    `json:"eCom"`
-	} `json:"solar"`
+	} `json:"power"`
 }
 
 type SensorFlowData struct {
