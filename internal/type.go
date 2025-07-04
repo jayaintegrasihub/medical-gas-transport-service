@@ -87,6 +87,7 @@ type SensorLevelData struct {
 		SolarLoadStatus   []string `json:"loadStat"`
 		SolarBattTemp     int      `json:"battTemp"`
 		SolarBattLevel    int      `json:"battLevel"`
+		SolarBattVolt	  int      `json:"battVolt"`
 		SolarEGen         []int    `json:"eGen"`
 		SolarECom         []int    `json:"eCom"`
 	} `json:"power"`
