@@ -139,15 +139,29 @@ func (s *Service) handleSensorLevel(topic string, payload []byte) {
 	levelData.SerialNumber = serialNumber
 	levelData.Timestamp = time.Unix(levelData.Ts, 0)
 
+	const slope = 42.84814815 // slope of the linear equation
+	const intercept = -267.5185185 // intercept of the linear equation
+	const kgToMetersCubics = 0.001 // conversion factor from kg to cubic meters
+	// formula = y = mx + c
+
+	var LevelInKilograms, LevelInMetersCubics float64
+	if levelData.Level == 0 {
+		LevelInKilograms = 0
+		LevelInMetersCubics = 0
+	} else {
+		LevelInKilograms = (levelData.Level * slope) + intercept
+		LevelInMetersCubics = LevelInKilograms * kgToMetersCubics
+	}
+
 	if s.cfg.TimescaleDB.Enabled {
 		query := `
 			INSERT INTO sensor_level (
-				time, serial_number, level, device_uptime, device_temp, 
+				time, serial_number, level, level_kg, level_meter_cubic, device_uptime, device_temp, 
 				device_hum, device_long, device_lat, device_rssi, device_hw_ver, device_fw_ver, 
 				device_rd_ver, device_model, device_mem_usage, solar_batt_temp, solar_batt_level, solar_batt_volt, solar_batt_status, 
 				solar_device_status, solar_load_status, solar_e_gen, solar_e_com,
 				hospital_id, device_id
-			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24)
+			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
 		`
 
 		var hospitalID, deviceID string
@@ -160,6 +174,8 @@ func (s *Service) handleSensorLevel(topic string, payload []byte) {
 			levelData.Timestamp,
 			levelData.SerialNumber,
 			levelData.Level,
+			LevelInKilograms,
+			LevelInMetersCubics,
 			levelData.Device.DeviceUptime,
 			levelData.Device.DeviceTemp,
 			levelData.Device.DeviceHum,
