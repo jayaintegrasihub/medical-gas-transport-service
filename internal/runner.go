@@ -62,11 +62,11 @@ func (s *Service) Start() {
 func (s *Service) subscribeToMQTT() {
 	s.mqttClient.Client.Subscribe(context.Background(), &paho.Subscribe{
 		Subscriptions: []paho.SubscribeOptions{
-			{Topic: "$share/g1/JI/v2/#", QoS: 1},
-			{Topic: "$share/g1/provisioning", QoS: 1},
-			{Topic: "$share/g1/JI/v2/+/level", QoS: 1},
-			{Topic: "$share/g1/JI/v2/+/flow", QoS: 1},
-			{Topic: "$share/g1/JI/v2/+/pressure", QoS: 1},
+			{Topic: "$share/g1/JI/v2/#", QoS: 0},
+			{Topic: "$share/g1/provisioning", QoS: 0},
+			{Topic: "$share/g1/JI/v2/+/level", QoS: 0},
+			{Topic: "$share/g1/JI/v2/+/flow", QoS: 0},
+			{Topic: "$share/g1/JI/v2/+/pressure", QoS: 0},
 		},
 	})
 }
