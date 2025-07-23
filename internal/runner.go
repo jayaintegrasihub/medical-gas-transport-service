@@ -105,7 +105,7 @@ func (s *Service) processMessages() {
 		case strings.HasPrefix(topic, "JI/v2/") && strings.HasSuffix(topic, "/pressure"):
 			s.handleSensorPressure(topic, payload)
 		default:
-			s.handleDeviceData(topic, payload)
+			log.Printf("Unknown topic: %s", topic)
 		}
 	}
 }
@@ -125,10 +125,16 @@ func (s *Service) handleSensorLevel(topic string, payload []byte) {
 		return
 	}
 
-	device, err := s.getDeviceFromService(serialNumber)
+	device, err := s.getDeviceFromCacheOrService(serialNumber)
 	if err != nil {
 		log.Printf("Error getting device info: %v", err)
+		return
 	}
+	
+	if device == nil {
+		log.Printf("Device not found for serial number: %s", serialNumber)
+		return
+	}		
 
 	var levelData SensorLevelData
 	if err := json.Unmarshal(payload, &levelData); err != nil {
@@ -139,10 +145,23 @@ func (s *Service) handleSensorLevel(topic string, payload []byte) {
 	levelData.SerialNumber = serialNumber
 	levelData.Timestamp = time.Unix(levelData.Ts, 0)
 
-	const slope = 42.84814815 // slope of the linear equation
-	const intercept = -267.5185185 // intercept of the linear equation
-	const kgToMetersCubics = 0.001 // conversion factor from kg to cubic meters
-	// formula = y = mx + c
+	conversionTable, err := s.getConversionTableWithCache(serialNumber)
+	if err != nil {
+		log.Printf("Error getting conversion table: %v", err)
+		return
+	}
+
+	slope := 42.84814815
+	intercept := -267.5185185
+	kgToMetersCubics := 0.001
+
+	for i := 0; i < len(conversionTable)-1; i++ {
+		if (conversionTable[i].InH2OMin <= levelData.Level) && (levelData.Level <= conversionTable[i].InH2OMax) {
+			slope = conversionTable[i].Slope
+			intercept = conversionTable[i].Intercept
+			break
+		}
+	}
 
 	var LevelInKilograms, LevelInMetersCubics float64
 	if levelData.Level == 0 {
@@ -159,16 +178,9 @@ func (s *Service) handleSensorLevel(topic string, payload []byte) {
 				time, serial_number, level, level_kg, level_meter_cubic, device_uptime, device_temp, 
 				device_hum, device_long, device_lat, device_rssi, device_hw_ver, device_fw_ver, 
 				device_rd_ver, device_model, device_mem_usage, solar_batt_temp, solar_batt_level, solar_batt_volt, solar_batt_status, 
-				solar_device_status, solar_load_status, solar_e_gen, solar_e_com,
-				hospital_id, device_id
-			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
+				solar_device_status, solar_load_status, solar_e_gen, solar_e_com
+			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24)
 		`
-
-		var hospitalID, deviceID string
-		if device != nil {
-			hospitalID = device.InstallationPointTank.Hospital
-			deviceID = device.ID
-		}
 
 		err = s.writeToTimescaleDB(query,
 			levelData.Timestamp,
@@ -195,8 +207,6 @@ func (s *Service) handleSensorLevel(topic string, payload []byte) {
 			pq.Array(levelData.Solar.SolarLoadStatus),
 			pq.Array(levelData.Solar.SolarEGen),
 			pq.Array(levelData.Solar.SolarECom),
-			hospitalID,
-			deviceID,
 		)
 
 		if err != nil {
@@ -241,9 +251,14 @@ func (s *Service) handleSensorFlow(topic string, payload []byte) {
 		return
 	}
 
-	device, err := s.getDeviceFromService(serialNumber)
+	device, err := s.getDeviceFromCacheOrService(serialNumber)
 	if err != nil {
 		log.Printf("Error getting device info: %v", err)
+	}
+
+	if device == nil {
+		log.Printf("Device not found for serial number: %s", serialNumber)
+		return
 	}
 
 	var flowData SensorFlowData
@@ -264,14 +279,9 @@ func (s *Service) handleSensorFlow(topic string, payload []byte) {
 				time, serial_number, total_volume, volume_high, volume_low, volume_decimal,
 				flow_rate, flow_rate_high, flow_rate_low, device_uptime, device_temp, 
 				device_hum, device_long, device_lat, device_rssi, device_hw_ver, device_fw_ver, 
-				device_rd_ver, device_model, hospital_id, device_id
-			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
+				device_rd_ver, device_model
+			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
 		`
-		var hospitalID, deviceID string
-		if device != nil {
-			hospitalID = device.InstallationPointFlow.Hospital
-			deviceID = device.ID
-		}
 
 		err = s.writeToTimescaleDB(query,
 			flowData.Timestamp,
@@ -293,8 +303,6 @@ func (s *Service) handleSensorFlow(topic string, payload []byte) {
 			flowData.Device.DeviceFWVer,
 			flowData.Device.DeviceRDVer,
 			flowData.Device.DeviceModel,
-			hospitalID,
-			deviceID,
 		)
 
 		if err != nil {
@@ -342,9 +350,14 @@ func (s *Service) handleSensorPressure(topic string, payload []byte) {
 		return
 	}
 
-	device, err := s.getDeviceFromService(serialNumber)
+	device, err := s.getConversionTableWithCache(serialNumber)
 	if err != nil {
 		log.Printf("Error getting device info: %v", err)
+	}
+
+	if device == nil {
+		log.Printf("Device not found for serial number: %s", serialNumber)
+		return
 	}
 
 	var pressureData SensorPressureData
@@ -407,16 +420,9 @@ func (s *Service) handleSensorPressure(topic string, payload []byte) {
 				vacuum_value, vacuum_connection, vacuum_enable, 
 				vacuum_high_limit, vacuum_low_limit,
 				device_uptime, device_temp, device_hum, device_long, device_lat, 
-				device_rssi, device_hw_ver, device_fw_ver, device_rd_ver, device_model,
-				hospital_id, device_id
-			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34)
+				device_rssi, device_hw_ver, device_fw_ver, device_rd_ver, device_model
+			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32)
 		`
-
-		var hospitalID, deviceID string
-		if device != nil {
-			hospitalID = device.InstallationPointPressure.Hospital
-			deviceID = device.ID
-		}
 
 		err = s.writeToTimescaleDB(query,
 			pressureData.Timestamp,
@@ -451,8 +457,6 @@ func (s *Service) handleSensorPressure(topic string, payload []byte) {
 			pressureData.Device.DeviceFWVer,
 			pressureData.Device.DeviceRDVer,
 			pressureData.Device.DeviceModel,
-			hospitalID,
-			deviceID,
 		)
 
 		if err != nil {
@@ -528,27 +532,6 @@ func (s *Service) handleProvisioning(payload []byte) {
 	}
 }
 
-func (s *Service) handleDeviceData(topic string, payload []byte) {
-	t, err := extractTopic(topic)
-	if err != nil {
-		log.Printf("%v", err)
-		return
-	}
-
-	device, err := s.getDeviceFromCacheOrService(t.deviceId)
-	if err != nil {
-		log.Printf("%v", err)
-		return
-	}
-
-	switch t.subject {
-	case "gatewayhealth", "nodehealth":
-		s.handleHealthData(t, payload, device)
-	default:
-		s.handleNodeData(t, payload, device)
-	}
-}
-
 func (s *Service) getDeviceFromCacheOrService(serialNumber string) (*services.Device, error) {
 	result, err := s.redisClient.Rdb.Get(s.ctx, "device/"+serialNumber).Result()
 	if err == redis.Nil {
@@ -574,58 +557,30 @@ func (s *Service) getDeviceFromCacheOrService(serialNumber string) (*services.De
 	return &device, nil
 }
 
-func (s *Service) getDeviceFromService(serialNumber string) (*services.Device, error) {
-	device, err := s.jayaClient.GetDevice(serialNumber)
-	if err != nil {
-		return nil, fmt.Errorf("error getting device from service: %w", err)
-	}
-	return device, nil
-}
-
-func (s *Service) handleHealthData(t *eventTopic, payload []byte, device *services.Device) {
-	var healthData DeviceHealth
-	if err := json.Unmarshal(payload, &healthData); err != nil {
-		log.Printf("error unmarshaling health data: %v", err)
-		return
-	}
-
-	// device.Group["device"] = t.deviceId
-	// device.Group["gateway"] = t.gatewayId
-	fields := StructToMapReflect(healthData)
-	delete(fields, "ts")
-
-	if healthData.Modules != nil {
-		for _, module := range healthData.Modules {
-			fields[module.Name] = module.Status
+func (s *Service) getConversionTableWithCache(serialNumber string) ([]services.TankConversion, error) {
+	cacheKey := "conversion_table/" + serialNumber
+	result, err := s.redisClient.Rdb.Get(s.ctx, cacheKey).Result()
+	if err == redis.Nil {
+		table, err := s.jayaClient.GetConversionTable(serialNumber)
+		if err != nil {
+			return nil, fmt.Errorf("error getting conversion table from service: %w", err)
 		}
-	}
-	delete(fields, "modules")
+		log.Printf("Conversion table not found in cache, fetched from service: %s", serialNumber)
 
-	// point := influxdb2.NewPoint("deviceshealth", device.Group, fields, time.Unix(int64(healthData.Ts), 0))
-	// s.writeToInfluxDB(device.Tenant.Name, point)
-
-	log.Printf("Received device health data from %s", t.deviceId)
-}
-
-func (s *Service) handleNodeData(t *eventTopic, payload []byte, device *services.Device) {
-	var nodeData NodeIOData
-	if err := json.Unmarshal(payload, &nodeData); err != nil {
-		log.Printf("Error unmarshaling node data: %v", err)
-		return
+		if jsonTable, err := json.Marshal(table); err == nil {
+			s.redisClient.Rdb.Set(s.ctx, cacheKey, jsonTable, 3*time.Hour)
+		}
+		return table, nil
+	} else if err != nil {
+		return nil, fmt.Errorf("error getting conversion table from Redis: %w", err)
 	}
 
-	// device.Group["device"] = t.deviceId
-	// device.Group["gateway"] = t.gatewayId
-	// fields, err := convertToMap(nodeData.Data)
-	// if err != nil {
-	// 	log.Printf("Error converting node data to map: %v", err)
-	// 	return
-	// }
+	var table []services.TankConversion
+	if err := json.Unmarshal([]byte(result), &table); err != nil {
+		return nil, fmt.Errorf("error parsing conversion table JSON: %w", err)
+	}
 
-	// point := influxdb2.NewPoint(device.Type, device.Group, fields, time.Unix(int64(nodeData.Ts), 0))
-	// s.writeToInfluxDB(device.Tenant.Name, point)
-
-	log.Printf("Received node data from %s", t.deviceId)
+	return table, nil
 }
 
 func (s *Service) writeToInfluxDB(bucket string, point *write.Point) {

@@ -28,13 +28,12 @@ type Bed struct {
 type Device struct {
 	ID                          string                      `json:"id"`
 	SerialNumber                string                      `json:"serial_number"`
+    DeviceType                  string                      `json:"deviceType"`
 	Alias                       string                      `json:"alias"`
-	Description                 string                      `json:"description"`
+	Notes                       string                      `json:"notes"`
 	InstallationPointFlow       InstallationPointFlow       `json:"installation_point_flow"`
 	InstallationPointTank       InstallationPointTank       `json:"installation_point_tank"`
 	InstallationPointPressure   InstallationPointPressure   `json:"installation_point_pressure"`
-	CreatedAt                   JSONTime                    `json:"created_at"`
-	UpdatedAt                   JSONTime                    `json:"updated_at"`
 }
 
 type DeviceResponse struct {
@@ -54,52 +53,43 @@ type DeviceResponse struct {
 }
 
 type InstallationPointFlow struct {
-    ID                  string      `json:"id"`
-    Hospital            string      `json:"hospital"`
-    SerialNumber        string      `json:"serial_number"`
-    Floor               *string     `json:"floor"`
-    Building            *string     `json:"building"`
-    Room                *string     `json:"room"`
-    Bed                 string      `json:"bed"`
-    InstallationCode    string      `json:"installation_code"`
-    InstallationName    string      `json:"installation_name"`
-    InstallationType    string      `json:"installation_type"`
-    InstalledAt         string      `json:"installed_at"`
-    LastMaintenanceDate string      `json:"last_maintenance_date"`
-    Device              string      `json:"device"`
+    ID                string   `json:"id"`
+    Hospital          string   `json:"hospital"`
+    SerialNumber      string   `json:"serial_number"`
+    Floor             *string  `json:"floor"`
+    Building          *string  `json:"building"`
+    Room              *string  `json:"room"`
+    Bed               *string  `json:"bed"`
+    InstallationName  string   `json:"installation_name"`
+    InstalledAt       string   `json:"installed_at"`
+    Device            string   `json:"device"`
 }
 
 type InstallationPointTank struct {
-    ID                  string      `json:"id"`
-    Hospital            string      `json:"hospital"`
-    SerialNumber        string      `json:"serial_number"`
-    TankCode            string      `json:"tank_code"`
-    TankType            string      `json:"tank_type"`
-    Capacity            int         `json:"capacity"`
-    Status              string      `json:"status"`
-    InstalledAt         string      `json:"installed_at"`
-    LastMaintenanceDate string      `json:"last_maintenance_date"`
-    Device              string      `json:"device"`
-    CreatedAt           JSONTime    `json:"created_at"`
-    UpdatedAt           JSONTime    `json:"updated_at"`
+    ID                    string   `json:"id"`
+    Hospital              string   `json:"hospital"`
+    Tank                  string   `json:"tank"`
+    SerialNumber          string   `json:"serial_number"`
+    InstallationName      string   `json:"installation_name"`
+    MinimumLevelThreshold int      `json:"minimum_level_threshold"`
+    MaximumLevelThreshold int      `json:"maximum_level_threshold"`
+    InstalledAt           string   `json:"installed_at"`
+    Device                string   `json:"device"`
+    DeviceThreshold       string   `json:"device_threshold"`
 }
 
 type InstallationPointPressure struct {
     ID                  string    `json:"id"`
     Hospital            string    `json:"hospital"`
     SerialNumber        string    `json:"serial_number"`
+    InstallationName    string    `json:"installation_name"`
     Floor               *string   `json:"floor"`
     Building            *string   `json:"building"`
     Room                *string   `json:"room"`
-    GasTypes            []string  `json:"gas_types"`
     PressureUnit        string    `json:"pressure_unit"`
-    Status              string    `json:"status"`
     InstalledAt         string    `json:"installed_at"`
-    LastMaintenanceDate string    `json:"last_maintenance_date"`
     Device              string    `json:"device"`
     DeviceThreshold     string    `json:"device_threshold"`
-    CreatedAt           JSONTime  `json:"created_at"`
-    UpdatedAt           JSONTime  `json:"updated_at"`
 }
 
 type Tenant struct {
@@ -114,6 +104,13 @@ type JayaProvisionResponse struct {
 }
 type Jaya struct {
 	client *resty.Client
+}
+
+type TankConversion struct {
+    Slope      float64 `json:"slope"`
+    Intercept  float64 `json:"intercept"`
+    InH2OMax   float64 `json:"in_h2o_max"`
+    InH2OMin   float64 `json:"in_h2o_min"`
 }
 
 var ErrDeviceNotFound = errors.New("Device Not Found")
@@ -148,45 +145,63 @@ func (j *Jaya) GetDevice(serialNumber string) (*Device, error) {
     device := &Device{
         ID: getString(rawResponse.Data, "id"),
         SerialNumber: getString(rawResponse.Data, "serial_number"),
+        DeviceType: getString(rawResponse.Data, "deviceType"),
         Alias: getString(rawResponse.Data, "alias"),
-        Description: getString(rawResponse.Data, "description"),
+        Notes: getString(rawResponse.Data, "notes"),
     }
     
     if ipfData, ok := rawResponse.Data["installation_point_flow"].(map[string]interface{}); ok {
+        var floor, building, room, bed *string
+        if val, ok := ipfData["floor"]; ok {
+            if strVal, ok := val.(string); ok && strVal != "" {
+            floor = &strVal
+            }
+        }
+        if val, ok := ipfData["building"]; ok {
+            if strVal, ok := val.(string); ok && strVal != "" {
+            building = &strVal
+            }
+        }
+        if val, ok := ipfData["room"]; ok {
+            if strVal, ok := val.(string); ok && strVal != "" {
+            room = &strVal
+            }
+        }
+        if val, ok := ipfData["bed"]; ok {
+            if strVal, ok := val.(string); ok && strVal != "" {
+            bed = &strVal
+            }
+        }
         device.InstallationPointFlow = InstallationPointFlow{
-            ID: getString(ipfData, "id"),
-            Hospital: getString(ipfData, "hospital"),
-            SerialNumber: getString(ipfData, "serial_number"),
-            Bed: getString(ipfData, "bed"),
-            InstallationCode: getString(ipfData, "installation_code"),
+            ID:               getString(ipfData, "id"),
+            Hospital:         getString(ipfData, "hospital"),
+            SerialNumber:     getString(ipfData, "serial_number"),
+            Floor:            floor,
+            Building:         building,
+            Room:             room,
+            Bed:              bed,
             InstallationName: getString(ipfData, "installation_name"),
-            InstallationType: getString(ipfData, "installation_type"),
+            InstalledAt:      getString(ipfData, "installed_at"),
+            Device:           getString(ipfData, "device"),
         }
     }
 
     if iptData, ok := rawResponse.Data["installation_point_tank"].(map[string]interface{}); ok {
         device.InstallationPointTank = InstallationPointTank{
-            ID: getString(iptData, "id"),
-            Hospital: getString(iptData, "hospital"),
-            SerialNumber: getString(iptData, "serial_number"),
-            TankCode: getString(iptData, "tank_code"),
-            TankType: getString(iptData, "tank_type"),
-            Capacity: getInt(iptData, "capacity"),
-            Status: getString(iptData, "status"),
-            InstalledAt: getString(iptData, "installed_at"),
-            LastMaintenanceDate: getString(iptData, "last_maintenance_date"),
+            ID:                    getString(iptData, "id"),
+            Hospital:              getString(iptData, "hospital"),
+            Tank:                  getString(iptData, "tank"),
+            SerialNumber:          getString(iptData, "serial_number"),
+            InstallationName:      getString(iptData, "installation_name"),
+            MinimumLevelThreshold: getInt(iptData, "minimum_level_threshold"),
+            MaximumLevelThreshold: getInt(iptData, "maximum_level_threshold"),
+            InstalledAt:           getString(iptData, "installed_at"),
+            Device:                getString(iptData, "device"),
+            DeviceThreshold:       getString(iptData, "device_threshold"),
         }
     }
 
     if ippData, ok := rawResponse.Data["installation_point_pressure"].(map[string]interface{}); ok {
-        var gasTypes []string
-        if gt, ok := ippData["gas_types"].([]interface{}); ok {
-            for _, g := range gt {
-                if s, ok := g.(string); ok {
-                    gasTypes = append(gasTypes, s)
-                }
-            }
-        }
         var floor, building, room *string
         if val, ok := ippData["floor"]; ok {
             if strVal, ok := val.(string); ok && strVal != "" {
@@ -204,23 +219,40 @@ func (j *Jaya) GetDevice(serialNumber string) (*Device, error) {
             }
         }
         device.InstallationPointPressure = InstallationPointPressure{
-            ID: getString(ippData, "id"),
-            Hospital: getString(ippData, "hospital"),
-            SerialNumber: getString(ippData, "serial_number"),
-            Floor: floor,
-            Building: building,
-            Room: room,
-            GasTypes: gasTypes,
-            PressureUnit: getString(ippData, "pressure_unit"),
-            Status: getString(ippData, "status"),
-            InstalledAt: getString(ippData, "installed_at"),
-            LastMaintenanceDate: getString(ippData, "last_maintenance_date"),
-            Device: getString(ippData, "device"),
-            DeviceThreshold: getString(ippData, "device_threshold"),
+            ID:                getString(ippData, "id"),
+            Hospital:          getString(ippData, "hospital"),
+            SerialNumber:      getString(ippData, "serial_number"),
+            InstallationName:  getString(ippData, "installation_name"),
+            Floor:             floor,
+            Building:          building,
+            Room:              room,
+            PressureUnit:      getString(ippData, "pressure_unit"),
+            InstalledAt:       getString(ippData, "installed_at"),
+            Device:            getString(ippData, "device"),
+            DeviceThreshold:   getString(ippData, "device_threshold"),
         }
     }
     
     return device, nil
+}
+
+func (j *Jaya) GetConversionTable(serialNumber string) ([]TankConversion, error) {
+    var rawResponse struct {
+        Status string           `json:"status"`
+        Data   struct {
+            TankConversionTable []TankConversion `json:"tank_conversion_table"`
+        } `json:"data"`
+    }
+    resp, err := j.client.R().SetResult(&rawResponse).Get("/tank-conversion-table/" + serialNumber + "/formula")
+    if err != nil {
+        return nil, err
+    }
+
+    if resp.StatusCode() != 200 {
+        return nil, errors.New(string(resp.Body()))
+    }
+
+    return rawResponse.Data.TankConversionTable, nil
 }
 
 func getString(data map[string]interface{}, key string) string {
