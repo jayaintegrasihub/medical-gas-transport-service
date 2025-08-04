@@ -177,9 +177,9 @@ func (s *Service) handleSensorLevel(topic string, payload []byte) {
 			INSERT INTO sensor_level (
 				time, serial_number, level, level_kg, level_meter_cubic, device_uptime, device_temp, 
 				device_hum, device_long, device_lat, device_rssi, device_hw_ver, device_fw_ver, 
-				device_rd_ver, device_model, device_mem_usage, solar_batt_temp, solar_batt_level, solar_batt_volt, solar_batt_status, 
+				device_rd_ver, device_model, device_mem_usage, device_reset_reason, solar_batt_temp, solar_batt_level, solar_batt_volt, solar_batt_status, 
 				solar_device_status, solar_load_status, solar_e_gen, solar_e_com
-			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24)
+			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25)
 		`
 
 		err = s.writeToTimescaleDB(query,
@@ -199,6 +199,7 @@ func (s *Service) handleSensorLevel(topic string, payload []byte) {
 			levelData.Device.DeviceRDVer,
 			levelData.Device.DeviceModel,
 			levelData.Device.DeviceMemUsage,
+			levelData.Device.DeviceResetReason,
 			levelData.Solar.SolarBattTemp,
 			levelData.Solar.SolarBattLevel,
 			levelData.Solar.SolarBattVolt,
@@ -279,8 +280,8 @@ func (s *Service) handleSensorFlow(topic string, payload []byte) {
 				time, serial_number, total_volume, volume_high, volume_low, volume_decimal,
 				flow_rate, flow_rate_high, flow_rate_low, device_uptime, device_temp, 
 				device_hum, device_long, device_lat, device_rssi, device_hw_ver, device_fw_ver, 
-				device_rd_ver, device_model
-			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+				device_rd_ver, device_model, device_reset_reason
+			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
 		`
 
 		err = s.writeToTimescaleDB(query,
@@ -303,6 +304,7 @@ func (s *Service) handleSensorFlow(topic string, payload []byte) {
 			flowData.Device.DeviceFWVer,
 			flowData.Device.DeviceRDVer,
 			flowData.Device.DeviceModel,
+			flowData.Device.DeviceResetReason,
 		)
 
 		if err != nil {
@@ -420,8 +422,8 @@ func (s *Service) handleSensorPressure(topic string, payload []byte) {
 				vacuum_value, vacuum_connection, vacuum_enable, 
 				vacuum_high_limit, vacuum_low_limit,
 				device_uptime, device_temp, device_hum, device_long, device_lat, 
-				device_rssi, device_hw_ver, device_fw_ver, device_rd_ver, device_model
-			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32)
+				device_rssi, device_hw_ver, device_fw_ver, device_rd_ver, device_model, device_reset_reason
+			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33)
 		`
 
 		err = s.writeToTimescaleDB(query,
@@ -457,6 +459,7 @@ func (s *Service) handleSensorPressure(topic string, payload []byte) {
 			pressureData.Device.DeviceFWVer,
 			pressureData.Device.DeviceRDVer,
 			pressureData.Device.DeviceModel,
+			pressureData.Device.DeviceResetReason,
 		)
 
 		if err != nil {

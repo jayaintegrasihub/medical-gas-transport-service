@@ -24,15 +24,6 @@ type ModulesData struct {
 	Status string `json:"status"`
 }
 
-type eventTopic struct {
-	prefix    string
-	version   string
-	gatewayId string
-	nodeId    string
-	subject   string
-	deviceId  string
-}
-
 type ProvisionRequest struct {
 	SerialNumber string `json:"serialNumber"`
 }
@@ -60,17 +51,18 @@ type IOData struct {
 }
 
 type Device struct {
-	DeviceUptime 	int     `json:"uptime"`
-	DeviceTemp   	float64 `json:"temp"`
-	DeviceHum    	float64 `json:"hum"`
-	DeviceLong   	float64 `json:"long"`
-	DeviceLat    	float64 `json:"lat"`
-	DeviceRSSI   	int     `json:"rssi"`
-	DeviceHWVer  	string  `json:"hwVer"`
-	DeviceFWVer  	string  `json:"fwVer"`
-	DeviceRDVer  	string  `json:"rdVer"`
-	DeviceModel  	string  `json:"model"`
-	DeviceMemUsage 	int		`json:"memory"`
+	DeviceUptime 			int     `json:"uptime"`
+	DeviceTemp   			float64 `json:"temp"`
+	DeviceHum    			float64 `json:"hum"`
+	DeviceLong   			float64 `json:"long"`
+	DeviceLat    			float64 `json:"lat"`
+	DeviceRSSI   			int     `json:"rssi"`
+	DeviceHWVer  			string  `json:"hwVer"`
+	DeviceFWVer  			string  `json:"fwVer"`
+	DeviceRDVer  			string  `json:"rdVer"`
+	DeviceModel  			string  `json:"model"`
+	DeviceMemUsage 		int			`json:"memory"`
+	DeviceResetReason int    	`json:"resetReason"`
 }
 
 type SensorLevelData struct {
