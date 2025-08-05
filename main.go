@@ -52,14 +52,6 @@ func main() {
 		log.Fatalf("Error creating MQTT client: %v", err)
 	}
 
-	// Create InfluxDB client
-	log.Printf("Setup Influxdb Service")
-	influxClient, err := services.NewInfluxClient(ctx, cfg.InfluxDB)
-	if err != nil {
-		log.Printf("Error creating InfluxDB client: %v. Skipping InfluxDB setup.", err)
-		influxClient = nil
-	}
-
 	// Create Redis client
 	log.Printf("Setup Redis Service")
 	redisClient, err := services.NewRedisClient(cfg.Redis)
@@ -79,7 +71,7 @@ func main() {
 	}
 
 	// Start the service
-	svc := internal.NewService(ctx, mqttClient, influxClient, redisClient, jayaClient, timescaleClient, cfg)
+	svc := internal.NewService(ctx, mqttClient, redisClient, jayaClient, timescaleClient, cfg)
 	svc.Start()
 
 	log.Println("Service started. Waiting for shutdown signal.")

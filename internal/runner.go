@@ -14,8 +14,6 @@ import (
 
 	"github.com/eclipse/paho.golang/autopaho"
 	"github.com/eclipse/paho.golang/paho"
-	influxdb2 "github.com/influxdata/influxdb-client-go/v2"
-	"github.com/influxdata/influxdb-client-go/v2/api/write"
 	"github.com/lib/pq"
 	"github.com/redis/go-redis/v9"
 )
@@ -23,20 +21,18 @@ import (
 type Service struct {
 	ctx             context.Context
 	mqttClient      *services.MqttClient
-	influxClient    *services.InfluxClient
 	redisClient     *services.Redis
 	jayaClient      *services.Jaya
 	timescaleClient *services.TimescaleClient
 	cfg             *config.Config
-	messageChan 	chan MqttMessage
-	messageCount 	atomic.Int64
+	messageChan     chan MqttMessage
+	messageCount    atomic.Int64
 }
 
-func NewService(ctx context.Context, mqttClient *services.MqttClient, influxClient *services.InfluxClient, redisClient *services.Redis, jayaClient *services.Jaya, timescaleClient *services.TimescaleClient, cfg *config.Config) *Service {
+func NewService(ctx context.Context, mqttClient *services.MqttClient, redisClient *services.Redis, jayaClient *services.Jaya, timescaleClient *services.TimescaleClient, cfg *config.Config) *Service {
 	return &Service{
 		ctx:             ctx,
 		mqttClient:      mqttClient,
-		influxClient:    influxClient,
 		redisClient:     redisClient,
 		jayaClient:      jayaClient,
 		timescaleClient: timescaleClient,
@@ -153,7 +149,7 @@ func (s *Service) handleSensorLevel(topic string, payload []byte) {
 
 	slope := 42.84814815
 	intercept := -267.5185185
-	kgToMetersCubics := 0.001
+	kgToMetersCubics := 1.29
 
 	for i := 0; i < len(conversionTable)-1; i++ {
 		if (conversionTable[i].InH2OMin <= levelData.Level) && (levelData.Level <= conversionTable[i].InH2OMax) {
@@ -169,70 +165,49 @@ func (s *Service) handleSensorLevel(topic string, payload []byte) {
 		LevelInMetersCubics = 0
 	} else {
 		LevelInKilograms = (levelData.Level * slope) + intercept
-		LevelInMetersCubics = LevelInKilograms * kgToMetersCubics
+		LevelInMetersCubics = LevelInKilograms / kgToMetersCubics
 	}
 
-	if s.cfg.TimescaleDB.Enabled {
-		query := `
-			INSERT INTO sensor_level (
-				time, serial_number, level, level_kg, level_meter_cubic, device_uptime, device_temp, 
-				device_hum, device_long, device_lat, device_rssi, device_hw_ver, device_fw_ver, 
-				device_rd_ver, device_model, device_mem_usage, device_reset_reason, solar_batt_temp, solar_batt_level, solar_batt_volt, solar_batt_status, 
-				solar_device_status, solar_load_status, solar_e_gen, solar_e_com
-			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25)
-		`
+	query := `
+		INSERT INTO sensor_level (
+			time, serial_number, level, level_kg, level_meter_cubic, device_uptime, device_temp, 
+			device_hum, device_long, device_lat, device_rssi, device_hw_ver, device_fw_ver, 
+			device_rd_ver, device_model, device_mem_usage, device_reset_reason, solar_batt_temp, solar_batt_level, solar_batt_volt, solar_batt_status, 
+			solar_device_status, solar_load_status, solar_e_gen, solar_e_com
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25)
+	`
 
-		err = s.writeToTimescaleDB(query,
-			levelData.Timestamp,
-			levelData.SerialNumber,
-			levelData.Level,
-			LevelInKilograms,
-			LevelInMetersCubics,
-			levelData.Device.DeviceUptime,
-			levelData.Device.DeviceTemp,
-			levelData.Device.DeviceHum,
-			levelData.Device.DeviceLong,
-			levelData.Device.DeviceLat,
-			levelData.Device.DeviceRSSI,
-			levelData.Device.DeviceHWVer,
-			levelData.Device.DeviceFWVer,
-			levelData.Device.DeviceRDVer,
-			levelData.Device.DeviceModel,
-			levelData.Device.DeviceMemUsage,
-			levelData.Device.DeviceResetReason,
-			levelData.Solar.SolarBattTemp,
-			levelData.Solar.SolarBattLevel,
-			levelData.Solar.SolarBattVolt,
-			pq.Array(levelData.Solar.SolarBattStatus),
-			pq.Array(levelData.Solar.SolarDeviceStatus),
-			pq.Array(levelData.Solar.SolarLoadStatus),
-			pq.Array(levelData.Solar.SolarEGen),
-			pq.Array(levelData.Solar.SolarECom),
-		)
+	err = s.writeToTimescaleDB(query,
+		levelData.Timestamp,
+		levelData.SerialNumber,
+		levelData.Level,
+		LevelInKilograms,
+		LevelInMetersCubics,
+		levelData.Device.DeviceUptime,
+		levelData.Device.DeviceTemp,
+		levelData.Device.DeviceHum,
+		levelData.Device.DeviceLong,
+		levelData.Device.DeviceLat,
+		levelData.Device.DeviceRSSI,
+		levelData.Device.DeviceHWVer,
+		levelData.Device.DeviceFWVer,
+		levelData.Device.DeviceRDVer,
+		levelData.Device.DeviceModel,
+		levelData.Device.DeviceMemUsage,
+		levelData.Device.DeviceResetReason,
+		levelData.Solar.SolarBattTemp,
+		levelData.Solar.SolarBattLevel,
+		levelData.Solar.SolarBattVolt,
+		pq.Array(levelData.Solar.SolarBattStatus),
+		pq.Array(levelData.Solar.SolarDeviceStatus),
+		pq.Array(levelData.Solar.SolarLoadStatus),
+		pq.Array(levelData.Solar.SolarEGen),
+		pq.Array(levelData.Solar.SolarECom),
+	)
 
-		if err != nil {
-			log.Printf("Error writing sensor level data to TimescaleDB: %v", err)
-			return
-		}
-	} else {
-		tags := map[string]string{
-			"serial_number": levelData.SerialNumber,
-		}
-
-		fields := map[string]interface{}{
-			"level":            levelData.Level,
-			"device_uptime":    levelData.Device.DeviceUptime,
-			"device_temp":      levelData.Device.DeviceTemp,
-			"device_hum":       levelData.Device.DeviceHum,
-			"device_rssi":      levelData.Device.DeviceRSSI,
-			"device_mem_usage": levelData.Device.DeviceMemUsage,
-			"solar_batt_temp":  levelData.Solar.SolarBattTemp,
-			"solar_batt_level": levelData.Solar.SolarBattLevel,
-			"solar_batt_volt": levelData.Solar.SolarBattVolt,
-		}
-
-		point := influxdb2.NewPoint("oxygen_level", tags, fields, levelData.Timestamp)
-		s.writeToInfluxDB("oxygen_metrics", point)
+	if err != nil {
+		log.Printf("Error writing sensor level data to TimescaleDB: %v", err)
+		return
 	}
 
 	event := map[string]interface{}{
@@ -274,65 +249,41 @@ func (s *Service) handleSensorFlow(topic string, payload []byte) {
 	totalVolume := (flowData.VHi * 65536) + (flowData.VLo) + (flowData.VDec / 1000)
 	flowRate := ((flowData.FRateHi * 65536) + flowData.FRateLo) / 1000
 
-	if s.cfg.TimescaleDB.Enabled {
-		query := `
-			INSERT INTO sensor_flow (
-				time, serial_number, total_volume, volume_high, volume_low, volume_decimal,
-				flow_rate, flow_rate_high, flow_rate_low, device_uptime, device_temp, 
-				device_hum, device_long, device_lat, device_rssi, device_hw_ver, device_fw_ver, 
-				device_rd_ver, device_model, device_reset_reason
-			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
-		`
+	query := `
+		INSERT INTO sensor_flow (
+			time, serial_number, total_volume, volume_high, volume_low, volume_decimal,
+			flow_rate, flow_rate_high, flow_rate_low, device_uptime, device_temp, 
+			device_hum, device_long, device_lat, device_rssi, device_hw_ver, device_fw_ver, 
+			device_rd_ver, device_model, device_reset_reason
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
+	`
 
-		err = s.writeToTimescaleDB(query,
-			flowData.Timestamp,
-			flowData.SerialNumber,
-			totalVolume,
-			flowData.VHi,
-			flowData.VLo,
-			flowData.VDec,
-			flowRate,
-			flowData.FRateHi,
-			flowData.FRateLo,
-			flowData.Device.DeviceUptime,
-			flowData.Device.DeviceTemp,
-			flowData.Device.DeviceHum,
-			flowData.Device.DeviceLong,
-			flowData.Device.DeviceLat,
-			flowData.Device.DeviceRSSI,
-			flowData.Device.DeviceHWVer,
-			flowData.Device.DeviceFWVer,
-			flowData.Device.DeviceRDVer,
-			flowData.Device.DeviceModel,
-			flowData.Device.DeviceResetReason,
-		)
+	err = s.writeToTimescaleDB(query,
+		flowData.Timestamp,
+		flowData.SerialNumber,
+		totalVolume,
+		flowData.VHi,
+		flowData.VLo,
+		flowData.VDec,
+		flowRate,
+		flowData.FRateHi,
+		flowData.FRateLo,
+		flowData.Device.DeviceUptime,
+		flowData.Device.DeviceTemp,
+		flowData.Device.DeviceHum,
+		flowData.Device.DeviceLong,
+		flowData.Device.DeviceLat,
+		flowData.Device.DeviceRSSI,
+		flowData.Device.DeviceHWVer,
+		flowData.Device.DeviceFWVer,
+		flowData.Device.DeviceRDVer,
+		flowData.Device.DeviceModel,
+		flowData.Device.DeviceResetReason,
+	)
 
-		if err != nil {
-			log.Printf("Error writing sensor flow data to TimescaleDB: %v", err)
-			return
-		}
-	} else {
-
-		tags := map[string]string{
-			"serial_number": flowData.SerialNumber,
-		}
-
-		fields := map[string]interface{}{
-			"total_volume":   totalVolume,
-			"volume_high":    flowData.VHi,
-			"volume_low":     flowData.VLo,
-			"volume_decimal": flowData.VDec,
-			"flow_rate":      flowRate,
-			"flow_rate_high": flowData.FRateHi,
-			"flow_rate_low":  flowData.FRateLo,
-			"device_uptime":  flowData.Device.DeviceUptime,
-			"device_temp":    flowData.Device.DeviceTemp,
-			"device_hum":     flowData.Device.DeviceHum,
-			"device_rssi":    flowData.Device.DeviceRSSI,
-		}
-
-		point := influxdb2.NewPoint("oxygen_flow", tags, fields, flowData.Timestamp)
-		s.writeToInfluxDB("oxygen_metrics", point)
+	if err != nil {
+		log.Printf("Error writing sensor flow data to TimescaleDB: %v", err)
+		return
 	}
 
 	event := map[string]interface{}{
@@ -371,125 +322,99 @@ func (s *Service) handleSensorPressure(topic string, payload []byte) {
 	pressureData.SerialNumber = serialNumber
 	pressureData.Timestamp = time.Unix(pressureData.Ts, 0)
 
-	if s.cfg.TimescaleDB.Enabled {
-		var (
-			nitrousOxidePressure, nitrousOxideHighLimit, nitrousOxideLowLimit                float64
-			oxygenPressure, oxygenHighLimit, oxygenLowLimit                                  float64
-			medicalAirPressure, medicalAirHighLimit, medicalAirLowLimit                      float64
-			vacuumPressure, vacuumHighLimit, vacuumLowLimit                                  float64
-			nitrousOxideConnection, oxygenConnection, medicalAirConnection, vacuumConnection int
-			nitrousOxideEnable, oxygenEnable, medicalAirEnable, vacuumEnable                 bool
-		)
+	var (
+		nitrousOxidePressure, nitrousOxideHighLimit, nitrousOxideLowLimit                float64
+		oxygenPressure, oxygenHighLimit, oxygenLowLimit                                  float64
+		medicalAirPressure, medicalAirHighLimit, medicalAirLowLimit                      float64
+		vacuumPressure, vacuumHighLimit, vacuumLowLimit                                  float64
+		nitrousOxideConnection, oxygenConnection, medicalAirConnection, vacuumConnection int
+		nitrousOxideEnable, oxygenEnable, medicalAirEnable, vacuumEnable                 bool
+	)
 
-		for _, data := range pressureData.Data {
-			switch data.Measurement {
-			case "nitrous oxide":
-				nitrousOxidePressure = data.Value
-				nitrousOxideConnection = data.Connection
-				nitrousOxideEnable = data.Enable
-				nitrousOxideHighLimit = data.HighLimit
-				nitrousOxideLowLimit = data.LowLimit
-			case "oxygen":
-				oxygenPressure = data.Value
-				oxygenConnection = data.Connection
-				oxygenEnable = data.Enable
-				oxygenHighLimit = data.HighLimit
-				oxygenLowLimit = data.LowLimit
-			case "medical air":
-				medicalAirPressure = data.Value
-				medicalAirConnection = data.Connection
-				medicalAirEnable = data.Enable
-				medicalAirHighLimit = data.HighLimit
-				medicalAirLowLimit = data.LowLimit
-			case "vacuum":
-				vacuumPressure = data.Value
-				vacuumConnection = data.Connection
-				vacuumEnable = data.Enable
-				vacuumHighLimit = data.HighLimit
-				vacuumLowLimit = data.LowLimit
-			}
+	for _, data := range pressureData.Data {
+		switch data.Measurement {
+		case "nitrous oxide":
+			nitrousOxidePressure = data.Value
+			nitrousOxideConnection = data.Connection
+			nitrousOxideEnable = data.Enable
+			nitrousOxideHighLimit = data.HighLimit
+			nitrousOxideLowLimit = data.LowLimit
+		case "oxygen":
+			oxygenPressure = data.Value
+			oxygenConnection = data.Connection
+			oxygenEnable = data.Enable
+			oxygenHighLimit = data.HighLimit
+			oxygenLowLimit = data.LowLimit
+		case "medical air":
+			medicalAirPressure = data.Value
+			medicalAirConnection = data.Connection
+			medicalAirEnable = data.Enable
+			medicalAirHighLimit = data.HighLimit
+			medicalAirLowLimit = data.LowLimit
+		case "vacuum":
+			vacuumPressure = data.Value
+			vacuumConnection = data.Connection
+			vacuumEnable = data.Enable
+			vacuumHighLimit = data.HighLimit
+			vacuumLowLimit = data.LowLimit
 		}
+	}
 
-		query := `
-			INSERT INTO sensor_pressure (
-				time, serial_number, 
-				nitrous_oxide_value, nitrous_oxide_connection, nitrous_oxide_enable, 
-				nitrous_oxide_high_limit, nitrous_oxide_low_limit,
-				oxygen_value, oxygen_connection, oxygen_enable, 
-				oxygen_high_limit, oxygen_low_limit,
-				medical_air_value, medical_air_connection, medical_air_enable, 
-				medical_air_high_limit, medical_air_low_limit,
-				vacuum_value, vacuum_connection, vacuum_enable, 
-				vacuum_high_limit, vacuum_low_limit,
-				device_uptime, device_temp, device_hum, device_long, device_lat, 
-				device_rssi, device_hw_ver, device_fw_ver, device_rd_ver, device_model, device_reset_reason
-			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33)
-		`
+	query := `
+		INSERT INTO sensor_pressure (
+			time, serial_number, 
+			nitrous_oxide_value, nitrous_oxide_connection, nitrous_oxide_enable, 
+			nitrous_oxide_high_limit, nitrous_oxide_low_limit,
+			oxygen_value, oxygen_connection, oxygen_enable, 
+			oxygen_high_limit, oxygen_low_limit,
+			medical_air_value, medical_air_connection, medical_air_enable, 
+			medical_air_high_limit, medical_air_low_limit,
+			vacuum_value, vacuum_connection, vacuum_enable, 
+			vacuum_high_limit, vacuum_low_limit,
+			device_uptime, device_temp, device_hum, device_long, device_lat, 
+			device_rssi, device_hw_ver, device_fw_ver, device_rd_ver, device_model, device_reset_reason
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33)
+	`
 
-		err = s.writeToTimescaleDB(query,
-			pressureData.Timestamp,
-			pressureData.SerialNumber,
-			nitrousOxidePressure,
-			nitrousOxideConnection,
-			nitrousOxideEnable,
-			nitrousOxideHighLimit,
-			nitrousOxideLowLimit,
-			oxygenPressure,
-			oxygenConnection,
-			oxygenEnable,
-			oxygenHighLimit,
-			oxygenLowLimit,
-			medicalAirPressure,
-			medicalAirConnection,
-			medicalAirEnable,
-			medicalAirHighLimit,
-			medicalAirLowLimit,
-			vacuumPressure,
-			vacuumConnection,
-			vacuumEnable,
-			vacuumHighLimit,
-			vacuumLowLimit,
-			pressureData.Device.DeviceUptime,
-			pressureData.Device.DeviceTemp,
-			pressureData.Device.DeviceHum,
-			pressureData.Device.DeviceLong,
-			pressureData.Device.DeviceLat,
-			pressureData.Device.DeviceRSSI,
-			pressureData.Device.DeviceHWVer,
-			pressureData.Device.DeviceFWVer,
-			pressureData.Device.DeviceRDVer,
-			pressureData.Device.DeviceModel,
-			pressureData.Device.DeviceResetReason,
-		)
+	err = s.writeToTimescaleDB(query,
+		pressureData.Timestamp,
+		pressureData.SerialNumber,
+		nitrousOxidePressure,
+		nitrousOxideConnection,
+		nitrousOxideEnable,
+		nitrousOxideHighLimit,
+		nitrousOxideLowLimit,
+		oxygenPressure,
+		oxygenConnection,
+		oxygenEnable,
+		oxygenHighLimit,
+		oxygenLowLimit,
+		medicalAirPressure,
+		medicalAirConnection,
+		medicalAirEnable,
+		medicalAirHighLimit,
+		medicalAirLowLimit,
+		vacuumPressure,
+		vacuumConnection,
+		vacuumEnable,
+		vacuumHighLimit,
+		vacuumLowLimit,
+		pressureData.Device.DeviceUptime,
+		pressureData.Device.DeviceTemp,
+		pressureData.Device.DeviceHum,
+		pressureData.Device.DeviceLong,
+		pressureData.Device.DeviceLat,
+		pressureData.Device.DeviceRSSI,
+		pressureData.Device.DeviceHWVer,
+		pressureData.Device.DeviceFWVer,
+		pressureData.Device.DeviceRDVer,
+		pressureData.Device.DeviceModel,
+		pressureData.Device.DeviceResetReason,
+	)
 
-		if err != nil {
-			log.Printf("Error writing sensor pressure data to TimescaleDB: %v", err)
-			return
-		}
-	} else {
-		tags := map[string]string{
-			"serial_number": pressureData.SerialNumber,
-		}
-
-		fields := map[string]interface{}{
-			"device_uptime": pressureData.Device.DeviceUptime,
-			"device_temp":   pressureData.Device.DeviceTemp,
-			"device_hum":    pressureData.Device.DeviceHum,
-			"device_rssi":   pressureData.Device.DeviceRSSI,
-		}
-
-		// Add pressure values for each gas type
-		for _, data := range pressureData.Data {
-			gasType := strings.ReplaceAll(data.Measurement, " ", "_")
-			fields[gasType+"_pressure"] = data.Value
-			fields[gasType+"_connection"] = data.Connection
-			fields[gasType+"_enable"] = data.Enable
-			fields[gasType+"_high_limit"] = data.HighLimit
-			fields[gasType+"_low_limit"] = data.LowLimit
-		}
-
-		point := influxdb2.NewPoint("oxygen_pressure", tags, fields, pressureData.Timestamp)
-		s.writeToInfluxDB("oxygen_metrics", point)
+	if err != nil {
+		log.Printf("Error writing sensor pressure data to TimescaleDB: %v", err)
+		return
 	}
 
 	event := map[string]interface{}{
@@ -584,11 +509,6 @@ func (s *Service) getConversionTableWithCache(serialNumber string) ([]services.T
 	}
 
 	return table, nil
-}
-
-func (s *Service) writeToInfluxDB(bucket string, point *write.Point) {
-	writeApi := s.influxClient.Client.WriteAPI(s.cfg.InfluxDB.Org, bucket)
-	writeApi.WritePoint(point)
 }
 
 func (s *Service) writeToTimescaleDB(query string, args ...interface{}) error {

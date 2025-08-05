@@ -6,7 +6,6 @@ import (
 
 type Config struct {
 	MQTT     		MQTTConfig
-	InfluxDB 		InfluxDBConfig
 	JayaApi  		JayaApiConfig
 	Redis    		RedisConfig
 	TimescaleDB TimescaleDBConfig
@@ -18,13 +17,6 @@ type MQTTConfig struct {
 	Topic    string
 	Username string
 	Password string
-}
-
-type InfluxDBConfig struct {
-	URL    string
-	Token  string
-	Org    string
-	Bucket string
 }
 
 type JayaApiConfig struct {
@@ -61,12 +53,6 @@ func LoadConfig() *Config {
 			Username: viper.GetString("MQTT_USERNAME"),
 			Password: viper.GetString("MQTT_PASSWORD"),
 		},
-		InfluxDB: InfluxDBConfig{
-			URL:    viper.GetString("INFLUXDB_URL"),
-			Token:  viper.GetString("INFLUXDB_TOKEN"),
-			Org:    viper.GetString("INFLUXDB_ORG"),
-			Bucket: viper.GetString("INFLUXDB_BUCKET"),
-		},
 		JayaApi: JayaApiConfig{
 			URL:   viper.GetString("JAYA_URL"),
 			Token: viper.GetString("JAYA_TOKEN"),
@@ -88,8 +74,3 @@ func LoadConfig() *Config {
 		},
 	}
 }
-
-// AI/v2/gatewayid/devicehealth
-// AI/v2/gatewayid/nodeid/devicehealth
-// AI/v2/gatewayid/nodeid/serial
-// AI/v2/gatewayid/nodeid/io

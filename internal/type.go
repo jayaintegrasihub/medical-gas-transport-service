@@ -3,27 +3,6 @@ package internal
 import (
 	"time"
 )
-
-type DeviceHealth struct {
-	MessageId   int           `json:"msgId"`
-	Ts          int           `json:"ts"`
-	Uptime      int           `json:"uptime"`
-	Temperature float32       `json:"temp"`
-	Humidity    float32       `json:"hum"`
-	Rssi        float32       `json:"rssi"`
-	HwVersion   string        `json:"hwVer"`
-	FwVersion   string        `json:"fwVer"`
-	RdVersion   string        `json:"rdVer"`
-	Model       string        `json:"model"`
-	Modules     []ModulesData `json:"modules"`
-	ResetReason int           `json:"resetReason"`
-}
-
-type ModulesData struct {
-	Name   string `json:"name"`
-	Status string `json:"status"`
-}
-
 type ProvisionRequest struct {
 	SerialNumber string `json:"serialNumber"`
 }
@@ -37,17 +16,6 @@ type ProvisionResponseData struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
 	Status   string `json:"status"`
-}
-
-type NodeIOData struct {
-	Ts   int      `json:"ts"`
-	Rssi int      `json:"rssi"`
-	Data []IOData `json:"data"`
-}
-
-type IOData struct {
-	Value interface{} `json:"value"`
-	Tag   string      `json:"tag"`
 }
 
 type Device struct {
