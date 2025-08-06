@@ -27,14 +27,6 @@ func (s *Service) HandleSensorData(topic string, payload []byte) {
 	}	
 }
 
-func extractSerialNumberFromTopic(topic string) (string, error) {
-	parts := strings.Split(topic, "/")
-	if len(parts) != 4 {
-		return "", fmt.Errorf("invalid topic format: %s", topic)
-	}
-	return parts[2], nil
-}
-
 func (s *Service) handleSensorLevel(topic string, payload []byte) {
 	serialNumber, err := extractSerialNumberFromTopic(topic)
 	if err != nil {
@@ -397,12 +389,4 @@ func (s *Service) getConversionTableWithCache(serialNumber string) ([]services.T
 	}
 
 	return table, nil
-}
-
-func (s *Service) writeToTimescaleDB(query string, args ...interface{}) error {
-	_, err := s.timescaleClient.DB.ExecContext(s.ctx, query, args...)
-	if err != nil {
-		return fmt.Errorf("error writing data to TimescaleDB: %w", err)
-	}
-	return nil
 }

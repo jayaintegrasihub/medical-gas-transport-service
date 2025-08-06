@@ -88,3 +88,20 @@ type MqttMessage struct {
 	Topic   string
 	Payload []byte
 }
+
+type FillingPayload struct {
+	Ts       			int64     `json:"ts"`
+	FillingState  int16     `json:"filling-state"`
+	Level    			float64   `json:"level"`
+	NanoID   			string    `json:"nano_id,omitempty"`
+
+	State    			bool      `json:"-"`
+	SerialNumber 	string    `json:"-"`
+	Timestamp   	time.Time `json:"-"`
+}
+
+type FillingResponsePayload struct {
+	Status    string    `json:"status"`
+	Timestamp int64			`json:"timestamp"`
+	NanoID    string    `json:"nano_id"`
+}
