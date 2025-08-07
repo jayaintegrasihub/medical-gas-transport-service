@@ -24,8 +24,8 @@ const LOGO = `
 
 `
 
-const SERVICENAME = "Jaya Transport Service"
-const VERSION = "v2.0.0"
+const SERVICENAME = "Medical Gas Transport Service"
+const VERSION = "v0.10.0"
 
 func main() {
 	fmt.Print(LOGO + SERVICENAME + " " + VERSION + "\n\n")

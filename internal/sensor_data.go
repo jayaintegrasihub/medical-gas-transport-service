@@ -51,6 +51,11 @@ func (s *Service) handleSensorLevel(topic string, payload []byte) {
 		return
 	}
 
+	if (levelData.Level < 0) {
+		log.Printf("Invalid level data: %v", levelData.Level)
+		return
+	}
+
 	levelData.SerialNumber = serialNumber
 	levelData.Timestamp = time.Unix(levelData.Ts, 0)
 
