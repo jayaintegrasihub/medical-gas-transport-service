@@ -129,7 +129,8 @@ func (s *Service) handleSensorLevel(topic string, payload []byte) {
 	}
 
 	event := map[string]interface{}{
-		"level": levelData,
+		"serial_number": serialNumber,
+		"level":         levelData,
 	}
 	eventJSON, _ := json.Marshal(event)
 	s.redisClient.Rdb.Publish(s.ctx, "sensor:level", eventJSON)
@@ -205,7 +206,8 @@ func (s *Service) handleSensorFlow(topic string, payload []byte) {
 	}
 
 	event := map[string]interface{}{
-		"flow": flowData,
+		"serial_number": serialNumber,
+		"flow":          flowData,
 	}
 	eventJSON, _ := json.Marshal(event)
 	s.redisClient.Rdb.Publish(s.ctx, "sensor:flow", eventJSON)
@@ -336,7 +338,8 @@ func (s *Service) handleSensorPressure(topic string, payload []byte) {
 	}
 
 	event := map[string]interface{}{
-		"pressure": pressureData,
+		"serial_number": serialNumber,
+		"pressure":      pressureData,
 	}
 	eventJSON, _ := json.Marshal(event)
 	s.redisClient.Rdb.Publish(s.ctx, "sensor:pressure", eventJSON)
