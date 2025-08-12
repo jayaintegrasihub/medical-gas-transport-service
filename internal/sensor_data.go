@@ -132,8 +132,8 @@ func (s *Service) handleSensorLevel(topic string, payload []byte) {
 		"level": levelData,
 	}
 	eventJSON, _ := json.Marshal(event)
-	s.redisClient.Rdb.Publish(s.ctx, "oxygen:updates", eventJSON)
-	log.Println("Data processed and published:", levelData)
+	s.redisClient.Rdb.Publish(s.ctx, "sensor:level", eventJSON)
+	log.Println("Sensor Level data processed and published:", levelData)
 
 	log.Printf("Successfully stored sensor level data for device %s", levelData.SerialNumber)
 }
@@ -208,8 +208,8 @@ func (s *Service) handleSensorFlow(topic string, payload []byte) {
 		"flow": flowData,
 	}
 	eventJSON, _ := json.Marshal(event)
-	s.redisClient.Rdb.Publish(s.ctx, "oxygen:updates", eventJSON)
-	log.Println("Data processed and published:", flowData)
+	s.redisClient.Rdb.Publish(s.ctx, "sensor:flow", eventJSON)
+	log.Println("Sensor Flow data processed and published:", flowData)
 
 	log.Printf("Successfully stored sensor flow data for device %s", flowData.SerialNumber)
 }
@@ -339,8 +339,8 @@ func (s *Service) handleSensorPressure(topic string, payload []byte) {
 		"pressure": pressureData,
 	}
 	eventJSON, _ := json.Marshal(event)
-	s.redisClient.Rdb.Publish(s.ctx, "oxygen:updates", eventJSON)
-	log.Println("Pressure data processed and published:", pressureData)
+	s.redisClient.Rdb.Publish(s.ctx, "sensor:pressure", eventJSON)
+	log.Println("Sensor Pressure data processed and published:", pressureData)
 
 	log.Printf("Successfully stored sensor pressure data for device %s", pressureData.SerialNumber)
 }
