@@ -56,7 +56,7 @@ func (s *Service) HandleFilling(topic string, payload []byte) {
 
 	slope := 42.84814815
 	intercept := -267.5185185
-	kgToMetersCubics := 1.29
+	kgToMetersCubics := 0.777
 
 	for i := 0; i < len(conversionTable)-1; i++ {
 		if (conversionTable[i].InH2OMin <= fillingData.Level) && (fillingData.Level <= conversionTable[i].InH2OMax) {
@@ -72,7 +72,7 @@ func (s *Service) HandleFilling(topic string, payload []byte) {
 		LevelInMetersCubics = 0
 	} else {
 		LevelInKilograms = (fillingData.Level * slope) + intercept
-		LevelInMetersCubics = LevelInKilograms / kgToMetersCubics
+		LevelInMetersCubics = LevelInKilograms * kgToMetersCubics
 	}
 
 	var NanoID string
