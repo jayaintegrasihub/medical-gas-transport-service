@@ -41,7 +41,7 @@ func NewService(ctx context.Context, mqttClient *services.MqttClient, redisClien
 func (s *Service) Start() {
 	s.subscribeToMQTT()
 	s.addPublishHandler()
-	s.startWorkerPool(5)
+	s.startWorkerPool(10)
 
 	go func() {
 		ticker := time.NewTicker(time.Second * 15)
