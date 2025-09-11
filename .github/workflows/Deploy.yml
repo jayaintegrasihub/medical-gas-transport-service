@@ -63,6 +63,8 @@ jobs:
             
             docker stop medical-gas-transport-service || echo "Container not running"
             docker rm medical-gas-transport-service
+            
             docker rmi jayaintegrasihub/medical-gas-transport-service:latest
             docker pull jayaintegrasihub/medical-gas-transport-service:latest || echo "Failed to pull image"
-            docker run -t -d -p 5341:5341 --env-file .env --name medical-gas-transport-service --network oxygen-network jayaintegrasihub/medical-gas-transport-service:latest
+            
+            docker run -t -d -p 5341:5341 --env-file .env --name medical-gas-transport-service --network host jayaintegrasihub/medical-gas-transport-service:latest
