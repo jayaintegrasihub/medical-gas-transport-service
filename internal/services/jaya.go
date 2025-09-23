@@ -28,6 +28,7 @@ type Bed struct {
 type Device struct {
 	ID                          string                      `json:"id"`
 	SerialNumber                string                      `json:"serial_number"`
+    Hospital                    Hospital                    `json:"hospital"`
     DeviceType                  string                      `json:"deviceType"`
 	Alias                       string                      `json:"alias"`
 	Notes                       string                      `json:"notes"`
@@ -126,7 +127,9 @@ func NewJayaService(conf config.JayaApiConfig) *Jaya {
 func (j *Jaya) GetDevice(serialNumber string) (*Device, error) {
     var rawResponse struct {
         Status string `json:"status"`
-        Data   map[string]interface{} `json:"data"`
+        Data   struct {
+            Device map[string]interface{} `json:"device"`
+        } `json:"data"`
     }
     
     resp, err := j.client.R().SetResult(&rawResponse).Get("/devices/serial_number/" + serialNumber)
@@ -143,14 +146,20 @@ func (j *Jaya) GetDevice(serialNumber string) (*Device, error) {
     }
 
     device := &Device{
-        ID: getString(rawResponse.Data, "id"),
-        SerialNumber: getString(rawResponse.Data, "serial_number"),
-        DeviceType: getString(rawResponse.Data, "deviceType"),
-        Alias: getString(rawResponse.Data, "alias"),
-        Notes: getString(rawResponse.Data, "notes"),
+        ID: getString(rawResponse.Data.Device, "id"),
+        SerialNumber: getString(rawResponse.Data.Device, "serial_number"),
+        DeviceType: getString(rawResponse.Data.Device, "deviceType"),
+        Alias: getString(rawResponse.Data.Device, "alias"),
+        Notes: getString(rawResponse.Data.Device, "notes"),
+    }
+
+    if iptData, ok := rawResponse.Data.Device["hospital"].(map[string]interface{}); ok {
+        device.Hospital = Hospital{
+            ID: getString(iptData, "id"),
+        }
     }
     
-    if ipfData, ok := rawResponse.Data["installation_point_flow"].(map[string]interface{}); ok {
+    if ipfData, ok := rawResponse.Data.Device["installation_point_flow"].(map[string]interface{}); ok {
         var floor, building, room, bed *string
         if val, ok := ipfData["floor"]; ok {
             if strVal, ok := val.(string); ok && strVal != "" {
@@ -186,7 +195,7 @@ func (j *Jaya) GetDevice(serialNumber string) (*Device, error) {
         }
     }
 
-    if iptData, ok := rawResponse.Data["installation_point_tank"].(map[string]interface{}); ok {
+    if iptData, ok := rawResponse.Data.Device["installation_point_tank"].(map[string]interface{}); ok {
         device.InstallationPointTank = InstallationPointTank{
             ID:                    getString(iptData, "id"),
             Hospital:              getString(iptData, "hospital"),
@@ -201,7 +210,7 @@ func (j *Jaya) GetDevice(serialNumber string) (*Device, error) {
         }
     }
 
-    if ippData, ok := rawResponse.Data["installation_point_pressure"].(map[string]interface{}); ok {
+    if ippData, ok := rawResponse.Data.Device["installation_point_pressure"].(map[string]interface{}); ok {
         var floor, building, room *string
         if val, ok := ippData["floor"]; ok {
             if strVal, ok := val.(string); ok && strVal != "" {
