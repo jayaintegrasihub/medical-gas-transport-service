@@ -63,6 +63,11 @@ func (s *Service) handleSensorLevel(topic string, payload []byte) {
 		return
 	}
 
+	if s.isDuplicateRecord("sensor_level", serialNumber, levelData.Timestamp) {
+		log.Printf("Duplicate record detected for device %s at %v, skipping", serialNumber, levelData.Timestamp)
+		return
+	}
+
 	conversionTable, err := s.getConversionTableWithCache(serialNumber)
 	if err != nil {
 		log.Printf("Error getting conversion table: %v", err)
@@ -162,6 +167,7 @@ func (s *Service) handleSensorLevel(topic string, payload []byte) {
 		return
 	}
 
+	// Only publish if insert was successful
 	event := map[string]interface{}{
 		"serial_number"	: serialNumber,
 		"data"					: redisData,
@@ -246,6 +252,7 @@ func (s *Service) handleSensorFlow(topic string, payload []byte) {
 		return
 	}
 
+	// Only publish if insert was successful
 	event := map[string]interface{}{
 		"serial_number"	: serialNumber,
 		"data"					: flowData,
@@ -385,6 +392,7 @@ func (s *Service) handleSensorPressure(topic string, payload []byte) {
 		return
 	}
 
+	// Only publish if insert was successful
 	event := map[string]interface{}{
 		"serial_number"	: serialNumber,
 		"data"					: pressureData,
