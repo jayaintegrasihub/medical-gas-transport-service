@@ -7,7 +7,6 @@ import (
 	"strings"
 	"encoding/json"
 	
-	
 	"medical-gas-transport-service/internal/services"
 
 	"github.com/lib/pq"
@@ -51,13 +50,23 @@ func (s *Service) handleSensorLevel(topic string, payload []byte) {
 		return
 	}
 
-	if (levelData.Level < 0) {
+	if levelData.Level < 0 {
 		log.Printf("Invalid level data: %v", levelData.Level)
 		return
 	}
 
 	levelData.SerialNumber = serialNumber
 	levelData.Timestamp = time.Unix(levelData.Ts, 0)
+
+	if s.isDuplicateRecord("sensor_level", serialNumber, levelData.Timestamp) {
+		log.Printf("Duplicate record detected for device %s at %v, skipping", serialNumber, levelData.Timestamp)
+		return
+	}
+
+	if s.isDuplicateRecord("sensor_level", serialNumber, levelData.Timestamp) {
+		log.Printf("Duplicate record detected for device %s at %v, skipping", serialNumber, levelData.Timestamp)
+		return
+	}
 
 	conversionTable, err := s.getConversionTableWithCache(serialNumber)
 	if err != nil {
@@ -90,12 +99,14 @@ func (s *Service) handleSensorLevel(topic string, payload []byte) {
 		INSERT INTO sensor_level (
 			time, serial_number, level, level_kg, level_meter_cubic, device_uptime, device_temp, 
 			device_hum, device_long, device_lat, device_rssi, device_hw_ver, device_fw_ver, 
-			device_rd_ver, device_model, device_mem_usage, device_reset_reason, solar_batt_temp, solar_batt_level, solar_batt_volt, solar_batt_status, 
-			solar_device_status, solar_load_status, solar_e_gen, solar_e_com
+			device_rd_ver, device_model, device_mem_usage, device_reset_reason, solar_batt_temp, 
+			solar_batt_level, solar_batt_volt, solar_batt_status, solar_device_status, 
+			solar_load_status, solar_e_gen, solar_e_com
 		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25)
+		ON CONFLICT (time, serial_number) DO NOTHING
 	`
 
-	err = s.writeToTimescaleDB(query,
+	err = s.writeToTimescaleDBWithRetry(query,
 		levelData.Timestamp,
 		levelData.SerialNumber,
 		levelData.Level,
@@ -123,20 +134,48 @@ func (s *Service) handleSensorLevel(topic string, payload []byte) {
 		pq.Array(levelData.Solar.SolarECom),
 	)
 
+	redisData := map[string]interface{}{
+		"timestamp":        levelData.Timestamp,
+		"serial_number":    levelData.SerialNumber,
+		"level":           levelData.Level,
+		"level_kg":        LevelInKilograms,
+		"level_m3":        LevelInMetersCubics,
+		"device_uptime":   levelData.Device.DeviceUptime,
+		"device_temp":     levelData.Device.DeviceTemp,
+		"device_hum":      levelData.Device.DeviceHum,
+		"device_long":     levelData.Device.DeviceLong,
+		"device_lat":      levelData.Device.DeviceLat,
+		"device_rssi":     levelData.Device.DeviceRSSI,
+		"device_hw_ver":   levelData.Device.DeviceHWVer,
+		"device_fw_ver":   levelData.Device.DeviceFWVer,
+		"device_rd_ver":   levelData.Device.DeviceRDVer,
+		"device_model":    levelData.Device.DeviceModel,
+		"device_mem_usage": levelData.Device.DeviceMemUsage,
+		"device_reset_reason": levelData.Device.DeviceResetReason,
+		"solar_batt_temp": levelData.Solar.SolarBattTemp,
+		"solar_batt_level": levelData.Solar.SolarBattLevel,
+		"solar_batt_volt": levelData.Solar.SolarBattVolt,
+		"solar_batt_status": levelData.Solar.SolarBattStatus,
+		"solar_device_status": levelData.Solar.SolarDeviceStatus,
+		"solar_load_status": levelData.Solar.SolarLoadStatus,
+		"solar_e_gen":     levelData.Solar.SolarEGen,
+		"solar_e_com":     levelData.Solar.SolarECom,
+	}
+
 	if err != nil {
 		log.Printf("Error writing sensor level data to TimescaleDB: %v", err)
 		return
 	}
 
+	// Only publish if insert was successful
 	event := map[string]interface{}{
-		"serial_number": serialNumber,
-		"level":         levelData,
+		"serial_number"	: serialNumber,
+		"data"					: redisData,
 	}
-	eventJSON, _ := json.Marshal(event)
-	s.redisClient.Rdb.Publish(s.ctx, "sensor:level", eventJSON)
-	log.Println("Sensor Level data processed and published:", levelData)
-
-	log.Printf("Successfully stored sensor level data for device %s", levelData.SerialNumber)
+	if eventJSON, err := json.Marshal(event); err == nil {
+		s.redisClient.Rdb.Publish(s.ctx, "sensor:level", eventJSON)
+		log.Printf("Successfully stored and published sensor level data for device %s", serialNumber)
+	}
 }
 
 func (s *Service) handleSensorFlow(topic string, payload []byte) {
@@ -149,6 +188,7 @@ func (s *Service) handleSensorFlow(topic string, payload []byte) {
 	device, err := s.getDeviceFromCacheOrService(serialNumber)
 	if err != nil {
 		log.Printf("Error getting device info: %v", err)
+		return
 	}
 
 	if device == nil {
@@ -165,6 +205,12 @@ func (s *Service) handleSensorFlow(topic string, payload []byte) {
 	flowData.SerialNumber = serialNumber
 	flowData.Timestamp = time.Unix(flowData.Ts, 0)
 
+	// Check for duplicate before processing
+	if s.isDuplicateRecord("sensor_flow", serialNumber, flowData.Timestamp) {
+		log.Printf("Duplicate record detected for device %s at %v, skipping", serialNumber, flowData.Timestamp)
+		return
+	}
+
 	totalVolume := (flowData.VHi * 65536) + (flowData.VLo) + (flowData.VDec / 1000)
 	flowRate := ((flowData.FRateHi * 65536) + flowData.FRateLo) / 1000
 
@@ -175,9 +221,10 @@ func (s *Service) handleSensorFlow(topic string, payload []byte) {
 			device_hum, device_long, device_lat, device_rssi, device_hw_ver, device_fw_ver, 
 			device_rd_ver, device_model, device_reset_reason
 		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
+		ON CONFLICT (time, serial_number) DO NOTHING
 	`
 
-	err = s.writeToTimescaleDB(query,
+	err = s.writeToTimescaleDBWithRetry(query,
 		flowData.Timestamp,
 		flowData.SerialNumber,
 		totalVolume,
@@ -205,15 +252,15 @@ func (s *Service) handleSensorFlow(topic string, payload []byte) {
 		return
 	}
 
+	// Only publish if insert was successful
 	event := map[string]interface{}{
-		"serial_number": serialNumber,
-		"flow":          flowData,
+		"serial_number"	: serialNumber,
+		"data"					: flowData,
 	}
-	eventJSON, _ := json.Marshal(event)
-	s.redisClient.Rdb.Publish(s.ctx, "sensor:flow", eventJSON)
-	log.Println("Sensor Flow data processed and published:", flowData)
-
-	log.Printf("Successfully stored sensor flow data for device %s", flowData.SerialNumber)
+	if eventJSON, err := json.Marshal(event); err == nil {
+		s.redisClient.Rdb.Publish(s.ctx, "sensor:flow", eventJSON)
+		log.Printf("Successfully stored and published sensor flow data for device %s", serialNumber)
+	}
 }
 
 func (s *Service) handleSensorPressure(topic string, payload []byte) {
@@ -226,6 +273,7 @@ func (s *Service) handleSensorPressure(topic string, payload []byte) {
 	device, err := s.getDeviceFromCacheOrService(serialNumber)
 	if err != nil {
 		log.Printf("Error getting device info: %v", err)
+		return
 	}
 
 	if device == nil {
@@ -241,6 +289,12 @@ func (s *Service) handleSensorPressure(topic string, payload []byte) {
 
 	pressureData.SerialNumber = serialNumber
 	pressureData.Timestamp = time.Unix(pressureData.Ts, 0)
+
+	// Check for duplicate before processing
+	if s.isDuplicateRecord("sensor_pressure", serialNumber, pressureData.Timestamp) {
+		log.Printf("Duplicate record detected for device %s at %v, skipping", serialNumber, pressureData.Timestamp)
+		return
+	}
 
 	var (
 		nitrousOxidePressure, nitrousOxideHighLimit, nitrousOxideLowLimit                float64
@@ -294,9 +348,10 @@ func (s *Service) handleSensorPressure(topic string, payload []byte) {
 			device_uptime, device_temp, device_hum, device_long, device_lat, 
 			device_rssi, device_hw_ver, device_fw_ver, device_rd_ver, device_model, device_reset_reason
 		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33)
+		ON CONFLICT (time, serial_number) DO NOTHING
 	`
 
-	err = s.writeToTimescaleDB(query,
+	err = s.writeToTimescaleDBWithRetry(query,
 		pressureData.Timestamp,
 		pressureData.SerialNumber,
 		nitrousOxidePressure,
@@ -337,15 +392,15 @@ func (s *Service) handleSensorPressure(topic string, payload []byte) {
 		return
 	}
 
+	// Only publish if insert was successful
 	event := map[string]interface{}{
-		"serial_number": serialNumber,
-		"pressure":      pressureData,
+		"serial_number"	: serialNumber,
+		"data"					: pressureData,
 	}
-	eventJSON, _ := json.Marshal(event)
-	s.redisClient.Rdb.Publish(s.ctx, "sensor:pressure", eventJSON)
-	log.Println("Sensor Pressure data processed and published:", pressureData)
-
-	log.Printf("Successfully stored sensor pressure data for device %s", pressureData.SerialNumber)
+	if eventJSON, err := json.Marshal(event); err == nil {
+		s.redisClient.Rdb.Publish(s.ctx, "sensor:pressure", eventJSON)
+		log.Printf("Successfully stored and published sensor pressure data for device %s", serialNumber)
+	}
 }
 
 func (s *Service) getDeviceFromCacheOrService(serialNumber string) (*services.Device, error) {
@@ -353,6 +408,7 @@ func (s *Service) getDeviceFromCacheOrService(serialNumber string) (*services.De
 	if err == redis.Nil {
 		device, err := s.jayaClient.GetDevice(serialNumber)
 		if err != nil {
+			log.Printf("Error getting device from service for serial %s: %v", serialNumber, err)
 			return nil, fmt.Errorf("error getting device from service: %w", err)
 		}
 		log.Printf("Device not found in cache, fetched from service: %s", serialNumber)

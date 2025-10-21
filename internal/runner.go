@@ -7,6 +7,7 @@ import (
 	"time"
 	"fmt"
 	"sync/atomic"
+	"github.com/lib/pq"
 
 	"medical-gas-transport-service/config"
 	"medical-gas-transport-service/internal/services"
@@ -116,4 +117,49 @@ func (s *Service) writeToTimescaleDB(query string, args ...interface{}) error {
 		return fmt.Errorf("error writing data to TimescaleDB: %w", err)
 	}
 	return nil
+}
+
+func (s *Service) writeToTimescaleDBWithRetry(query string, args ...interface{}) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	
+	_, err := s.timescaleClient.DB.ExecContext(ctx, query, args...)
+	if err != nil {
+		if pqErr, ok := err.(*pq.Error); ok {
+			switch pqErr.Code {
+			case "23505":
+				log.Printf("Duplicate key detected, skipping insert: %v", pqErr.Detail)
+				return nil
+			case "23503":
+				log.Printf("Foreign key violation: %v", pqErr.Detail)
+				return fmt.Errorf("foreign key violation: %w", err)
+			case "23502":
+				log.Printf("Not null violation: %v", pqErr.Detail)
+				return fmt.Errorf("not null violation: %w", err)
+			case "23514":
+				log.Printf("Check constraint violation: %v", pqErr.Detail)
+				return fmt.Errorf("check constraint violation: %w", err)
+			}
+		}
+		
+		if ctx.Err() == context.DeadlineExceeded {
+			log.Printf("Database query timeout: %v", err)
+			return fmt.Errorf("database query timeout: %w", err)
+		}
+		
+		return fmt.Errorf("database error: %w", err)
+	}
+	
+	return nil
+}
+
+func (s *Service) isDuplicateRecord(tableName, serialNumber string, timestamp time.Time) bool {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	
+	query := fmt.Sprintf("SELECT 1 FROM %s WHERE time = $1 AND serial_number = $2 LIMIT 1", tableName)
+	var exists int
+	err := s.timescaleClient.DB.QueryRowContext(ctx, query, timestamp, serialNumber).Scan(&exists)
+	
+	return err == nil && exists == 1
 }
