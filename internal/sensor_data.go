@@ -408,8 +408,7 @@ func (s *Service) getDeviceFromCacheOrService(serialNumber string) (*services.De
 	if err == redis.Nil {
 		device, err := s.jayaClient.GetDevice(serialNumber)
 		if err != nil {
-			log.Printf("Error getting device from service for serial %s: %v", serialNumber, err)
-			return nil, fmt.Errorf("error getting device from service: %w", err)
+			return nil, fmt.Errorf("error getting device from service: %w for serial: %s", err, serialNumber)
 		}
 		log.Printf("Device not found in cache, fetched from service: %s", serialNumber)
 

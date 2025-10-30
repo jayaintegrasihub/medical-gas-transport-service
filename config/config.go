@@ -1,7 +1,7 @@
 package config
 
 import (
-	"github.com/spf13/viper"
+	"github.com/caarlos0/env/v11"
 )
 
 type Config struct {
@@ -12,65 +12,39 @@ type Config struct {
 }
 
 type MQTTConfig struct {
-	Broker   string
-	ClientID string
-	Topic    string
-	Username string
-	Password string
+	Broker   string `env:"MQTT_BROKER,required"`
+	ClientID string `env:"MQTT_CLIENT_ID"`
+	Topic    string `env:"MQTT_TOPIC"`
+	Username string `env:"MQTT_USERNAME,required"`
+	Password string `env:"MQTT_PASSWORD,required"`
 }
 
 type JayaApiConfig struct {
-	URL   string
-	Token string
+	URL   string `env:"JAYA_URL,required"`
+	Token string `env:"JAYA_TOKEN,required"`
 }
 
 type RedisConfig struct {
-	URL      string
-	Password string
-	Username string
-	DB       int
+	URL      string `env:"REDIS_URL,required"`
+	Password string `env:"REDIS_PASSWORD,required"`
+	Username string `env:"REDIS_USERNAME,required"`
+	DB       int 	`env:"REDIS_DB,required"`
 }
 
 type TimescaleDBConfig struct {
-	User     string
-	Password string
-	Host     string
-	Port     string
-	DBName   string
-	SSLMode  string
-	Enabled  bool
+	User     string `env:"TIMESCALEDB_USER,required"`
+	Password string `env:"TIMESCALEDB_PASSWORD,required"`
+	Host     string `env:"TIMESCALEDB_HOST,required"`
+	Port     string `env:"TIMESCALEDB_PORT,required"`
+	DBName   string `env:"TIMESCALEDB_DB_NAME,required"`
+	SSLMode  string `env:"TIMESCALEDB_SSL_MODE"`
 }
 
-func LoadConfig() *Config {
-	viper.SetConfigFile(".env")
-	viper.ReadInConfig()
-
-	return &Config{
-		MQTT: MQTTConfig{
-			Broker:   viper.GetString("MQTT_BROKER"),
-			ClientID: viper.GetString("MQTT_CLIENT_ID"),
-			Topic:    viper.GetString("MQTT_TOPIC"),
-			Username: viper.GetString("MQTT_USERNAME"),
-			Password: viper.GetString("MQTT_PASSWORD"),
-		},
-		JayaApi: JayaApiConfig{
-			URL:   viper.GetString("JAYA_URL"),
-			Token: viper.GetString("JAYA_TOKEN"),
-		},
-		Redis: RedisConfig{
-			URL:      viper.GetString("REDIS_URL"),
-			Password: viper.GetString("REDIS_PASSWORD"),
-			Username: viper.GetString("REDIS_USERNAME"),
-			DB:       viper.GetInt("REDIS_DB"),
-		},
-		TimescaleDB: TimescaleDBConfig{
-			User:     viper.GetString("TIMESCALEDB_USER"),
-			Password: viper.GetString("TIMESCALEDB_PASSWORD"),
-			Host: 		viper.GetString("TIMESCALEDB_HOST"),
-			Port:     viper.GetString("TIMESCALEDB_PORT"),
-			DBName:   viper.GetString("TIMESCALEDB_DB_NAME"),
-			SSLMode:  viper.GetString("TIMESCALEDB_SSL_MODE"),
-			Enabled:  viper.GetBool("TIMESCALEDB_ENABLED"),
-		},
+func LoadConfig() (*Config, error) {
+	cfg := &Config{}
+	if err := env.Parse(cfg); err != nil {
+		return nil, err
 	}
+	
+	return cfg, nil
 }

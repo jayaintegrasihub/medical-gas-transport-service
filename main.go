@@ -25,13 +25,16 @@ const LOGO = `
 `
 
 const SERVICENAME = "Medical Gas Transport Service"
-const VERSION = "v0.10.0"
+const VERSION = "v4.1.0"
 
 func main() {
 	fmt.Print(LOGO + SERVICENAME + " " + VERSION + "\n\n")
 
 	// Load the configuration
-	cfg := config.LoadConfig()
+	cfg, err := config.LoadConfig()
+	if err != nil {
+		log.Fatalf("Error loading config: %v", err)
+	}
 
 	// Create a context with cancellation
 	ctx, cancel := context.WithCancel(context.Background())
