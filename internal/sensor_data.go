@@ -252,10 +252,17 @@ func (s *Service) handleSensorFlow(topic string, payload []byte) {
 		return
 	}
 
+	redisData := map[string]interface{}{
+    "timestamp":     flowData.Timestamp,
+    "serial_number": flowData.SerialNumber,
+    "total_volume":  totalVolume,
+    "flow_rate":     flowRate,
+}
+
 	// Only publish if insert was successful
 	event := map[string]interface{}{
 		"serial_number"	: serialNumber,
-		"data"					: flowData,
+		"data"					: redisData,
 	}
 	if eventJSON, err := json.Marshal(event); err == nil {
 		s.redisClient.Rdb.Publish(s.ctx, "sensor:flow", eventJSON)
